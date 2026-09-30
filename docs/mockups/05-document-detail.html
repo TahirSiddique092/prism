@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRISM — Document Detail & Reader</title>
+  <link rel="stylesheet" href="prism-design-system.css">
+</head>
+<body>
+
+  <!-- Mockup State Switcher & Quick Navigation Bar -->
+  <div class="mockup-toolbar">
+    <div class="mockup-toolbar-left">
+      <span class="mockup-badge">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 22 22 22 12 2"/></svg>
+        PRISM MOCKUP: 05-document-detail
+      </span>
+      <select class="mockup-page-select" onchange="window.location.href=this.value">
+        <option value="01-login.html">01. Login (/login)</option>
+        <option value="02-register.html">02. Register (/register)</option>
+        <option value="03-dashboard.html">03. Dashboard (/dashboard)</option>
+        <option value="04-search.html">04. Search (/search)</option>
+        <option value="05-document-detail.html" selected>05. Document Detail (/documents/:id)</option>
+        <option value="06-analytics-history.html">06. Analytics: History</option>
+        <option value="07-analytics-unsearched.html">07. Analytics: Unsearched</option>
+        <option value="08-analytics-top.html">08. Analytics: Top Documents</option>
+        <option value="index.html">→ All Mockups Index</option>
+      </select>
+    </div>
+    <div class="mockup-toolbar-states">
+      <span>Preview State:</span>
+      <button class="state-btn active" onclick="setState('loaded')">Loaded (with Relations)</button>
+      <button class="state-btn" onclick="setState('empty-relations')">No Related Docs</button>
+      <button class="state-btn" onclick="setState('error-404')">404 Error State</button>
+    </div>
+  </div>
+
+  <!-- Shared Application Shell Header -->
+  <header class="app-header">
+    <div class="app-header-inner">
+      <a href="03-dashboard.html" class="brand">
+        <div class="prism-logo-icon">
+          <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
+            <polygon points="20,4 36,36 4,36" fill="url(#prismGradNav3)" stroke="#3B82F6" stroke-width="2"/>
+            <line x1="20" y1="4" x2="20" y2="36" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="2 2"/>
+            <line x1="20" y1="20" x2="38" y2="24" stroke="#06B6D4" stroke-width="2"/>
+            <line x1="20" y1="20" x2="39" y2="28" stroke="#8B5CF6" stroke-width="2"/>
+            <defs>
+              <linearGradient id="prismGradNav3" x1="20" y1="4" x2="20" y2="36" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#3B82F6" stop-opacity="0.3"/>
+                <stop offset="1" stop-color="#090D16" stop-opacity="0.8"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="brand-text-wrap">
+          <span class="brand-title">PRISM</span>
+          <span class="brand-subtitle">Relational Search</span>
+        </div>
+      </a>
+
+      <nav class="nav-links">
+        <a href="03-dashboard.html" class="nav-link active">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Dashboard
+        </a>
+        <a href="04-search.html" class="nav-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Search
+        </a>
+        <a href="06-analytics-history.html" class="nav-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Analytics
+        </a>
+      </nav>
+
+      <div class="user-session">
+        <div class="user-avatar-wrap">
+          <div class="user-avatar">AR</div>
+          <span class="user-email">alex.rivera@university.edu</span>
+        </div>
+        <a href="01-login.html" class="btn btn-ghost btn-sm" title="Log out">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Logout
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    
+    <!-- State 1 & 2: Loaded Content -->
+    <div id="loaded-view">
+      
+      <!-- Back button and Navigation Context -->
+      <div style="margin-bottom: var(--space-4);">
+        <a href="03-dashboard.html" class="btn btn-ghost btn-sm" style="display: inline-flex; align-items: center; gap: 6px; padding-left: 0;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to Dashboard
+        </a>
+      </div>
+
+      <!-- Document Metadata Header -->
+      <div class="page-header" style="margin-bottom: var(--space-6); border-bottom: 1px solid var(--color-border-subtle); padding-bottom: var(--space-6);">
+        <div style="max-width: 800px;">
+          <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2);">
+            <h1 class="page-title" style="font-size: 1.6rem;">Database System Concepts: Chapter 12 Query Processing.pdf</h1>
+            <span class="badge badge-ready">
+              <span class="badge-dot"></span>
+              ready
+            </span>
+          </div>
+          
+          <div style="display: flex; flex-wrap: wrap; gap: var(--space-4); font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-3);">
+            <span>Uploaded: <strong style="color: var(--color-text-secondary);">Sep 28, 2026</strong></span>
+            <span>File Size: <strong style="color: var(--color-text-secondary);">4.8 MB</strong></span>
+            <span>Total Pages: <strong style="color: var(--color-text-secondary);">48 pages</strong></span>
+            <span>Vector Chunks: <strong style="color: var(--color-text-secondary); font-family: var(--font-mono);">42 chunks (pgvector)</strong></span>
+            <span>MinIO Path: <code style="color: #93C5FD;">/s3/user-1/doc-c4b9a.pdf</code></span>
+          </div>
+
+          <!-- Neo4j Topic Tags -->
+          <div style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
+            <span style="font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600;">Neo4j Topics:</span>
+            <span class="topic-tag">Query Optimization</span>
+            <span class="topic-tag">Relational Algebra</span>
+            <span class="topic-tag">Cost Estimation</span>
+            <span class="topic-tag">Hash Joins</span>
+            <span class="topic-tag">Catalog Statistics</span>
+          </div>
+        </div>
+
+        <div>
+          <button class="btn btn-secondary btn-sm" onclick="alert('Downloading original PDF from MinIO presigned URL...')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Document Reader & Related Topics Grid -->
+      <div class="doc-detail-grid">
+        
+        <!-- Column 1: Inline PDF Reader -->
+        <section class="pdf-viewer-card">
+          <!-- PDF Toolbar -->
+          <div class="pdf-toolbar">
+            <div class="pdf-toolbar-group">
+              <button class="btn btn-ghost btn-sm" style="padding: 4px 8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <span>Page <input type="number" value="12" min="1" max="48" style="width: 44px; text-align: center; background: #0F172A; border: 1px solid #374151; color: white; border-radius: 4px; padding: 2px;"> of 48</span>
+              <button class="btn btn-ghost btn-sm" style="padding: 4px 8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+
+            <div class="pdf-toolbar-group">
+              <button class="btn btn-ghost btn-sm" style="padding: 4px 8px;" title="Zoom Out">−</button>
+              <span style="font-family: var(--font-mono);">100%</span>
+              <button class="btn btn-ghost btn-sm" style="padding: 4px 8px;" title="Zoom In">+</button>
+              <button class="btn btn-ghost btn-sm" style="padding: 4px 8px;" title="Fit Width">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- PDF Canvas Rendering Simulation -->
+          <div class="pdf-canvas-mock">
+            <div class="pdf-paper">
+              <h1>Chapter 12: Query Processing & Optimization</h1>
+              <div class="author">Silberschatz, Korth, Sudarshan • Database System Concepts (Sixth Edition)</div>
+              
+              <h2 style="font-size: 1.15rem; font-family: var(--font-sans); margin: 20px 0 10px; color: #111827;">12.4 Evaluation of Expressions</h2>
+              <p>
+                In the earlier sections of this chapter, we considered how individual relational operations can be executed efficiently. We now turn our attention to the evaluation of an entire relational algebra expression consisting of multiple operations.
+              </p>
+              
+              <p>
+                An expression can be evaluated using either of two methods: <em>materialization</em> or <em>pipelining</em>. In materialized evaluation, the output of each operation in an expression is evaluated and stored in a temporary relation on disk, which is then used as input to subsequent operations.
+              </p>
+
+              <div style="background: #F3F4F6; border-left: 4px solid #3B82F6; padding: 12px 16px; margin: 16px 0; font-family: var(--font-mono); font-size: 0.85rem; color: #1F2937;">
+                <strong>Relational Join Cost Formula:</strong><br>
+                Cost(Nested_Loop) = B(r) + (N(r) * B(s)) / (M - 1)<br>
+                Cost(Hash_Join) = 3 * (B(r) + B(s)) + 4 * N_buckets
+              </div>
+
+              <p>
+                <mark>In relational query processing, the optimizer evaluates multiple alternative evaluation plans for a given expression. For relational joins, the cost difference between an unindexed nested-loop join and a hash-join or merge-join can be several orders of magnitude.</mark> The query execution plan specifies exactly which join algorithm to execute for each intermediate relation.
+              </p>
+
+              <p>
+                Catalog information such as relation cardinalities, index structures, number of distinct values for attributes, and distribution histograms are referenced by the cost estimation formulas. The plan with the lowest estimated total disk I/O and CPU computational cost is selected for pipelined execution.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Column 2: Neo4j Related Documents Sidebar -->
+        <aside>
+          <div class="related-docs-panel">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4);">
+              <h3 style="font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06B6D4" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                Related Documents
+              </h3>
+              <span style="font-size: var(--text-xs); color: var(--color-topic); font-family: var(--font-mono);">Neo4j Graph</span>
+            </div>
+
+            <p style="font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-4);">
+              Documents sharing topics via <code>(Document)-[:ABOUT]-&gt;(Topic)</code> relationships.
+            </p>
+
+            <!-- Populated Related Docs List -->
+            <div id="related-list">
+              <!-- Related Card 1 -->
+              <div class="related-card">
+                <a href="05-document-detail.html" class="related-title">Concurrency Control & Two-Phase Locking Protocols.pdf</a>
+                <div style="font-size: var(--text-xs); color: #67E8F9; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  2 shared topics
+                </div>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                  <span class="topic-tag" style="font-size: 0.65rem;">Query Optimization</span>
+                  <span class="topic-tag" style="font-size: 0.65rem;">Relational Algebra</span>
+                </div>
+              </div>
+
+              <!-- Related Card 2 -->
+              <div class="related-card">
+                <a href="05-document-detail.html" class="related-title">B-Plus Trees and High-Concurrency Storage Engines.pdf</a>
+                <div style="font-size: var(--text-xs); color: #67E8F9; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  1 shared topic
+                </div>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                  <span class="topic-tag" style="font-size: 0.65rem;">Cost Estimation</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Empty Related Docs Container -->
+            <div id="related-empty" class="empty-state" style="display: none; padding: var(--space-6) var(--space-4);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" stroke-width="2" style="margin: 0 auto 8px; display: block;"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              <h4 style="font-size: var(--text-sm); font-weight: 600; color: var(--color-text-secondary);">No related documents</h4>
+              <p style="font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 4px;">No other documents in your library share topic tags with this PDF.</p>
+            </div>
+
+          </div>
+        </aside>
+
+      </div>
+    </div>
+
+    <!-- State 3: 404 Error State -->
+    <div id="error-404-view" class="empty-state" style="display: none; margin-top: var(--space-12);">
+      <div class="empty-icon-wrap" style="color: var(--color-danger); background: var(--color-danger-tint);">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <h2 class="empty-title">Document Not Found (404)</h2>
+      <p class="empty-desc">The requested document ID does not exist or does not belong to your account. Access to other users' documents is strictly prohibited.</p>
+      <a href="03-dashboard.html" class="btn btn-primary btn-sm">Return to Dashboard</a>
+    </div>
+
+  </main>
+
+  <script>
+    function setState(state) {
+      document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.state-btn')).find(b => b.textContent.toLowerCase().includes(state));
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const loadedView = document.getElementById('loaded-view');
+      const errorView = document.getElementById('error-404-view');
+      const relatedList = document.getElementById('related-list');
+      const relatedEmpty = document.getElementById('related-empty');
+
+      if (state === 'loaded') {
+        loadedView.style.display = 'block';
+        errorView.style.display = 'none';
+        relatedList.style.display = 'block';
+        relatedEmpty.style.display = 'none';
+      } else if (state === 'empty-relations') {
+        loadedView.style.display = 'block';
+        errorView.style.display = 'none';
+        relatedList.style.display = 'none';
+        relatedEmpty.style.display = 'block';
+      } else if (state === 'error-404') {
+        loadedView.style.display = 'none';
+        errorView.style.display = 'block';
+      }
+    }
+  </script>
+</body>
+</html>

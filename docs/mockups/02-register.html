@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRISM — Create Account</title>
+  <link rel="stylesheet" href="prism-design-system.css">
+</head>
+<body>
+
+  <!-- Mockup State Switcher & Quick Navigation Bar -->
+  <div class="mockup-toolbar">
+    <div class="mockup-toolbar-left">
+      <span class="mockup-badge">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 22 22 22 12 2"/></svg>
+        PRISM MOCKUP: 02-register
+      </span>
+      <select class="mockup-page-select" onchange="window.location.href=this.value">
+        <option value="01-login.html">01. Login (/login)</option>
+        <option value="02-register.html" selected>02. Register (/register)</option>
+        <option value="03-dashboard.html">03. Dashboard (/dashboard)</option>
+        <option value="04-search.html">04. Search (/search)</option>
+        <option value="05-document-detail.html">05. Document Detail (/documents/:id)</option>
+        <option value="06-analytics-history.html">06. Analytics: History</option>
+        <option value="07-analytics-unsearched.html">07. Analytics: Unsearched</option>
+        <option value="08-analytics-top.html">08. Analytics: Top Documents</option>
+        <option value="index.html">→ All Mockups Index</option>
+      </select>
+    </div>
+    <div class="mockup-toolbar-states">
+      <span>Preview State:</span>
+      <button class="state-btn active" onclick="setState('default')">Default</button>
+      <button class="state-btn" onclick="setState('loading')">Loading</button>
+      <button class="state-btn" onclick="setState('error')">Error</button>
+    </div>
+  </div>
+
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="prism-logo-icon">
+          <svg width="38" height="38" viewBox="0 0 40 40" fill="none">
+            <polygon points="20,4 36,36 4,36" fill="url(#prismGradReg)" stroke="#3B82F6" stroke-width="2"/>
+            <line x1="20" y1="4" x2="20" y2="36" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="2 2"/>
+            <line x1="20" y1="20" x2="38" y2="24" stroke="#06B6D4" stroke-width="2"/>
+            <line x1="20" y1="20" x2="39" y2="28" stroke="#8B5CF6" stroke-width="2"/>
+            <defs>
+              <linearGradient id="prismGradReg" x1="20" y1="4" x2="20" y2="36" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#3B82F6" stop-opacity="0.3"/>
+                <stop offset="1" stop-color="#090D16" stop-opacity="0.8"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <h1 class="page-title" style="font-size: 1.5rem; margin-bottom: 4px;">Create your account</h1>
+        <p class="page-subtitle">Get started with AI-driven vector search for your PDFs</p>
+      </div>
+
+      <!-- Generic error message area -->
+      <div id="error-banner" class="alert-error" style="display: none;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="error-text">An account with this email address already exists.</span>
+      </div>
+
+      <form id="register-form" onsubmit="handleRegisterSubmit(event)">
+        <div class="form-group">
+          <label class="form-label" for="name">Full name <span class="required">*</span></label>
+          <input 
+            type="text" 
+            id="name" 
+            class="form-input" 
+            placeholder="Alex Rivera" 
+            autocomplete="name"
+            value="Alex Rivera"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="email">Email address <span class="required">*</span></label>
+          <input 
+            type="email" 
+            id="email" 
+            class="form-input" 
+            placeholder="student@university.edu" 
+            autocomplete="email" 
+            inputmode="email"
+            value="alex.rivera@university.edu"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password <span class="required">*</span></label>
+          <input 
+            type="password" 
+            id="password" 
+            class="form-input" 
+            placeholder="Create a password" 
+            autocomplete="new-password"
+            value="mysecurepass2026"
+            required
+          >
+          <span class="form-hint">At least 8 characters recommended</span>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn btn-primary" style="width: 100%; margin-top: 8px;">
+          <span id="btn-spinner" class="spinner" style="display: none;"></span>
+          <span id="btn-text">Sign up</span>
+        </button>
+      </form>
+
+      <div class="auth-footer-links">
+        Already have an account? 
+        <a href="01-login.html" style="font-weight: 600;">Log in</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function setState(state) {
+      document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.state-btn')).find(b => b.textContent.toLowerCase() === state);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const errorBanner = document.getElementById('error-banner');
+      const submitBtn = document.getElementById('submit-btn');
+      const btnSpinner = document.getElementById('btn-spinner');
+      const btnText = document.getElementById('btn-text');
+      const nameInput = document.getElementById('name');
+      const emailInput = document.getElementById('email');
+      const passwordInput = document.getElementById('password');
+
+      if (state === 'default') {
+        errorBanner.style.display = 'none';
+        submitBtn.disabled = false;
+        btnSpinner.style.display = 'none';
+        btnText.textContent = 'Sign up';
+        nameInput.disabled = false;
+        emailInput.disabled = false;
+        passwordInput.disabled = false;
+      } else if (state === 'loading') {
+        errorBanner.style.display = 'none';
+        submitBtn.disabled = true;
+        btnSpinner.style.display = 'inline-block';
+        btnText.textContent = 'Creating account...';
+        nameInput.disabled = true;
+        emailInput.disabled = true;
+        passwordInput.disabled = true;
+      } else if (state === 'error') {
+        errorBanner.style.display = 'flex';
+        submitBtn.disabled = false;
+        btnSpinner.style.display = 'none';
+        btnText.textContent = 'Sign up';
+        nameInput.disabled = false;
+        emailInput.disabled = false;
+        passwordInput.disabled = false;
+      }
+    }
+
+    function handleRegisterSubmit(e) {
+      e.preventDefault();
+      setState('loading');
+      setTimeout(() => {
+        // Redirect to dashboard on successful registration
+        window.location.href = '03-dashboard.html';
+      }, 900);
+    }
+  </script>
+</body>
+</html>
