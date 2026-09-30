@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRISM — Semantic Vector Search</title>
+  <link rel="stylesheet" href="prism-design-system.css">
+</head>
+<body>
+
+  <!-- Mockup State Switcher & Quick Navigation Bar -->
+  <div class="mockup-toolbar">
+    <div class="mockup-toolbar-left">
+      <span class="mockup-badge">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 22 22 22 12 2"/></svg>
+        PRISM MOCKUP: 04-search
+      </span>
+      <select class="mockup-page-select" onchange="window.location.href=this.value">
+        <option value="01-login.html">01. Login (/login)</option>
+        <option value="02-register.html">02. Register (/register)</option>
+        <option value="03-dashboard.html">03. Dashboard (/dashboard)</option>
+        <option value="04-search.html" selected>04. Search (/search)</option>
+        <option value="05-document-detail.html">05. Document Detail (/documents/:id)</option>
+        <option value="06-analytics-history.html">06. Analytics: History</option>
+        <option value="07-analytics-unsearched.html">07. Analytics: Unsearched</option>
+        <option value="08-analytics-top.html">08. Analytics: Top Documents</option>
+      </select>
+    </div>
+    <div class="mockup-toolbar-states">
+      <span>Preview State:</span>
+      <button class="state-btn active" onclick="setState('results')">Results Loaded</button>
+      <button class="state-btn" onclick="setState('loading')">Loading Skeleton</button>
+      <button class="state-btn" onclick="setState('empty')">Empty (0 Results)</button>
+    </div>
+  </div>
+
+  <!-- Shared Application Shell Header -->
+  <header class="app-header">
+    <div class="app-header-inner">
+      <a href="03-dashboard.html" class="brand">
+        <div class="prism-logo-icon">
+          <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
+            <polygon points="20,4 36,36 4,36" fill="url(#prismGradNav2)" stroke="#3B82F6" stroke-width="2"/>
+            <line x1="20" y1="4" x2="20" y2="36" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="2 2"/>
+            <line x1="20" y1="20" x2="38" y2="24" stroke="#06B6D4" stroke-width="2"/>
+            <line x1="20" y1="20" x2="39" y2="28" stroke="#8B5CF6" stroke-width="2"/>
+            <defs>
+              <linearGradient id="prismGradNav2" x1="20" y1="4" x2="20" y2="36" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#3B82F6" stop-opacity="0.3"/>
+                <stop offset="1" stop-color="#090D16" stop-opacity="0.8"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="brand-text-wrap">
+          <span class="brand-title">PRISM</span>
+          <span class="brand-subtitle">Relational Search</span>
+        </div>
+      </a>
+
+      <nav class="nav-links">
+        <a href="03-dashboard.html" class="nav-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Dashboard
+        </a>
+        <a href="04-search.html" class="nav-link active">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Search
+        </a>
+        <a href="06-analytics-history.html" class="nav-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Analytics
+        </a>
+      </nav>
+
+      <div class="user-session">
+        <div class="user-avatar-wrap">
+          <div class="user-avatar">AR</div>
+          <span class="user-email">alex.rivera@university.edu</span>
+        </div>
+        <a href="01-login.html" class="btn btn-ghost btn-sm" title="Log out">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Logout
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="main-content">
+    
+    <!-- Prominent Search Bar -->
+    <section class="search-hero">
+      <form onsubmit="handleSearchSubmit(event)">
+        <div class="search-input-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2.5" style="margin-right: 12px; flex-shrink: 0;">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input 
+            type="text" 
+            id="search-input" 
+            class="search-field" 
+            placeholder="Ask a question in plain English (e.g., 'how does two-phase locking prevent dirty reads?')..." 
+            value="how do relational joins optimize query execution plans?"
+          >
+          <button type="submit" class="btn btn-primary" style="padding: 10px 22px;">
+            Search
+          </button>
+        </div>
+      </form>
+
+      <div class="search-meta-bar">
+        <div>
+          <span>Try searches:</span>
+          <button class="btn btn-ghost btn-sm" style="padding: 2px 6px; font-size: 0.75rem;" onclick="setQuery('how do relational joins optimize query execution plans?')">"query execution plans"</button>
+          <button class="btn btn-ghost btn-sm" style="padding: 2px 6px; font-size: 0.75rem;" onclick="setQuery('strict two-phase locking cascading aborts')">"cascading aborts"</button>
+          <button class="btn btn-ghost btn-sm" style="padding: 2px 6px; font-size: 0.75rem;" onclick="setQuery('quantum entanglement in distributed storage')">"unmatched topic"</button>
+        </div>
+        <div id="search-stats" style="font-family: var(--font-mono);">
+          Top 10 results • pgvector cosine distance &lt; 0.75
+        </div>
+      </div>
+    </section>
+
+    <!-- State 1: Results Loaded Container -->
+    <div id="results-container">
+      
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4);">
+        <h2 style="font-size: var(--text-base); font-weight: 600; color: var(--color-text-secondary);">
+          Showing 3 semantic matches for <span style="color: #60A5FA;">"how do relational joins optimize query execution plans?"</span>
+        </h2>
+        <span class="badge badge-cached">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Cached (Redis 14ms)
+        </span>
+      </div>
+
+      <!-- Result Card 1 (High Semantic Match) -->
+      <article class="search-result-card">
+        <div class="result-header">
+          <div>
+            <a href="05-document-detail.html" class="result-title">Database System Concepts: Chapter 12 Query Processing.pdf</a>
+            <div style="display: flex; gap: var(--space-2); margin-top: 4px;">
+              <span class="topic-tag">Query Optimization</span>
+              <span class="topic-tag">Relational Algebra</span>
+            </div>
+          </div>
+          <div class="result-badges">
+            <span class="result-score">94% Semantic Match</span>
+          </div>
+        </div>
+        <div class="result-snippet">
+          "...In relational query processing, the optimizer evaluates multiple alternative evaluation plans for a given expression. For <mark>relational joins</mark>, the cost difference between an unindexed nested-loop join and a hash-join or merge-join can be several orders of magnitude. The <mark>query execution plan</mark> specifies exactly which join algorithm to execute for each intermediate relation..."
+        </div>
+        <div class="result-footer">
+          <span>Chunk #14 • 198 words • Embedding: <code>all-MiniLM-L6-v2</code></span>
+          <a href="05-document-detail.html" style="font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+            Open PDF Reader
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          </a>
+        </div>
+      </article>
+
+      <!-- Result Card 2 (Semantic Match) -->
+      <article class="search-result-card">
+        <div class="result-header">
+          <div>
+            <a href="05-document-detail.html" class="result-title">Database System Concepts: Chapter 12 Query Processing.pdf</a>
+            <div style="display: flex; gap: var(--space-2); margin-top: 4px;">
+              <span class="topic-tag">Query Optimization</span>
+              <span class="topic-tag">Cost Models</span>
+            </div>
+          </div>
+          <div class="result-badges">
+            <span class="result-score">88% Semantic Match</span>
+          </div>
+        </div>
+        <div class="result-snippet">
+          "...Equivalence rules transform relational algebraic operations into semantically equivalent trees. The optimizer pushes selections and projections as far down the operator tree as possible prior to computing <mark>expensive join operations</mark>, directly pruning the search space of possible <mark>execution trees</mark>..."
+        </div>
+        <div class="result-footer">
+          <span>Chunk #19 • 214 words • Embedding: <code>all-MiniLM-L6-v2</code></span>
+          <a href="05-document-detail.html" style="font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+            Open PDF Reader
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          </a>
+        </div>
+      </article>
+
+      <!-- Result Card 3 (FULLTEXT Fallback result demonstrator) -->
+      <article class="search-result-card">
+        <div class="result-header">
+          <div>
+            <a href="05-document-detail.html" class="result-title">B-Plus Trees and High-Concurrency Storage Engines.pdf</a>
+            <div style="display: flex; gap: var(--space-2); margin-top: 4px;">
+              <span class="topic-tag">Storage Engines</span>
+              <span class="topic-tag">B-Trees</span>
+            </div>
+          </div>
+          <div class="result-badges">
+            <span class="badge badge-fallback">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              FULLTEXT Fallback
+            </span>
+            <span class="result-score" style="color: #FB923C; background: rgba(249, 115, 22, 0.15); border-color: rgba(249, 115, 22, 0.3);">Keyword Match</span>
+          </div>
+        </div>
+        <div class="result-snippet">
+          "...When secondary indices are utilized during an index-nested loop join, leaf node traversals in the B+ Tree minimize random I/O disk seeks by clustering RID pointers before probing base page tuples..."
+        </div>
+        <div class="result-footer">
+          <span>Chunk #06 • Cosine distance &gt; 0.75 fallback triggered</span>
+          <a href="05-document-detail.html" style="font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+            Open PDF Reader
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          </a>
+        </div>
+      </article>
+
+    </div>
+
+    <!-- State 2: Loading Skeletons -->
+    <div id="loading-container" style="display: none;">
+      <div style="margin-bottom: var(--space-4);">
+        <div class="skeleton" style="width: 280px; height: 20px; margin-bottom: 8px;"></div>
+      </div>
+      <div class="card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
+        <div class="skeleton" style="width: 50%; height: 24px; margin-bottom: var(--space-3);"></div>
+        <div class="skeleton" style="width: 100%; height: 60px; margin-bottom: var(--space-4);"></div>
+        <div class="skeleton" style="width: 30%; height: 16px;"></div>
+      </div>
+      <div class="card" style="padding: var(--space-6); margin-bottom: var(--space-5);">
+        <div class="skeleton" style="width: 45%; height: 24px; margin-bottom: var(--space-3);"></div>
+        <div class="skeleton" style="width: 100%; height: 60px; margin-bottom: var(--space-4);"></div>
+        <div class="skeleton" style="width: 25%; height: 16px;"></div>
+      </div>
+    </div>
+
+    <!-- State 3: Empty Results State -->
+    <div id="empty-container" class="empty-state" style="display: none;">
+      <div class="empty-icon-wrap">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      </div>
+      <h3 class="empty-title">No semantic or keyword matches found</h3>
+      <p class="empty-desc">We searched chunk vectors in Postgres (pgvector) and fell back to MySQL FULLTEXT, but neither returned relevant passages. Try phrasing your query with broader relational database concepts.</p>
+      <div style="display: flex; justify-content: center; gap: var(--space-3);">
+        <a href="07-analytics-unsearched.html" class="btn btn-secondary btn-sm">Review Unsearched Documents</a>
+        <button class="btn btn-primary btn-sm" onclick="setQuery('relational algebra join algorithms')">Search "join algorithms"</button>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    function setState(state) {
+      document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.state-btn')).find(b => b.textContent.toLowerCase().includes(state));
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const results = document.getElementById('results-container');
+      const loading = document.getElementById('loading-container');
+      const empty = document.getElementById('empty-container');
+
+      if (state === 'results') {
+        results.style.display = 'block';
+        loading.style.display = 'none';
+        empty.style.display = 'none';
+      } else if (state === 'loading') {
+        results.style.display = 'none';
+        loading.style.display = 'block';
+        empty.style.display = 'none';
+      } else if (state === 'empty') {
+        results.style.display = 'none';
+        loading.style.display = 'none';
+        empty.style.display = 'block';
+      }
+    }
+
+    function setQuery(text) {
+      document.getElementById('search-input').value = text;
+      if (text.includes('quantum')) {
+        setState('empty');
+      } else {
+        setState('loading');
+        setTimeout(() => setState('results'), 500);
+      }
+    }
+
+    function handleSearchSubmit(e) {
+      e.preventDefault();
+      const val = document.getElementById('search-input').value.trim();
+      if (!val) return;
+      setState('loading');
+      setTimeout(() => {
+        if (val.toLowerCase().includes('empty') || val.toLowerCase().includes('quantum')) {
+          setState('empty');
+        } else {
+          setState('results');
+        }
+      }, 600);
+    }
+  </script>
+</body>
+</html>
