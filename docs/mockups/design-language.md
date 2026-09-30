@@ -239,7 +239,6 @@ All mockups are located under `docs/mockups/`:
 
 - `design-language.md` — *This specification document.*
 - `prism-design-system.css` — *Unified CSS design token and component library.*
-- `index.html` — *Design System Showcase & Mockup Gallery Hub.*
 - `01-login.html` — *Authentication: User Sign In.*
 - `02-register.html` — *Authentication: User Registration.*
 - `03-dashboard.html` — *Core App: Document Management, Upload & Delete.*
