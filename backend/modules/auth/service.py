@@ -45,7 +45,7 @@ def check_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
-def generate_token(user_id: int, email: str) -> str:
+def generate_token(user_id: int, email: str, expires_in: datetime.timedelta | None = None) -> str:
     """Generate a signed JWT token containing user_id, email, and 24-hour expiry.
     
     Payload strictly adheres to slice-03 acceptance criteria:
@@ -53,7 +53,8 @@ def generate_token(user_id: int, email: str) -> str:
     """
     secret = get_jwt_secret()
     now = datetime.datetime.now(datetime.timezone.utc)
-    exp_time = now + datetime.timedelta(hours=TOKEN_EXPIRY_HOURS)
+    delta = expires_in if expires_in is not None else datetime.timedelta(hours=TOKEN_EXPIRY_HOURS)
+    exp_time = now + delta
     
     payload = {
         "user_id": int(user_id),
