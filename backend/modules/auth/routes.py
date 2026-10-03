@@ -1,13 +1,15 @@
-"""Authentication route handlers for PRISM (Slice 03).
+"""Authentication route handlers for PRISM (Slice 03 & 04).
 
 Implements:
 - POST /api/auth/register
 - POST /api/auth/login
+- POST /api/auth/logout
 """
 import mysql.connector
 from flask import Blueprint, jsonify, request
 
 from .db import create_user, find_user_by_email
+from .middleware import require_auth
 from .service import check_password, generate_token, hash_password
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
@@ -106,3 +108,15 @@ def login():
         "user_id": user["user_id"],
         "token": token,
     }), 200
+
+
+@auth_bp.route("/logout", methods=["POST"])
+@require_auth
+def logout():
+    """Logout current user.
+    
+    Response: { message: "logged out" } (HTTP 200)
+    Stateless JWT: client discards token.
+    """
+    return jsonify({"message": "logged out"}), 200
+
