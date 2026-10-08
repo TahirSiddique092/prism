@@ -12,9 +12,9 @@ for path in (str(PROJECT_ROOT), str(CURRENT_DIR)):
         sys.path.insert(0, path)
 
 try:
-    from backend.modules.auth import auth_bp
+    from backend.modules.auth import auth_bp, register_auth_middleware
 except ImportError:
-    from modules.auth import auth_bp
+    from modules.auth import auth_bp, register_auth_middleware
 
 
 def create_app(test_config=None):
@@ -26,6 +26,9 @@ def create_app(test_config=None):
 
     # Register blueprints
     app.register_blueprint(auth_bp)
+
+    # Register authentication middleware (protects all routes by default except exempt routes)
+    register_auth_middleware(app)
 
     @app.route("/health")
     def health():
