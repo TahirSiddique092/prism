@@ -13,8 +13,12 @@ for path in (str(PROJECT_ROOT), str(CURRENT_DIR)):
 
 try:
     from backend.modules.auth import auth_bp, register_auth_middleware
+    from backend.modules.documents.routes import documents_bp
+    from backend.modules.documents.storage import ensure_bucket_exists
 except ImportError:
     from modules.auth import auth_bp, register_auth_middleware
+    from modules.documents.routes import documents_bp
+    from modules.documents.storage import ensure_bucket_exists
 
 
 def create_app(test_config=None):
@@ -26,6 +30,13 @@ def create_app(test_config=None):
 
     # Register blueprints
     app.register_blueprint(auth_bp)
+    app.register_blueprint(documents_bp)
+    
+    if not test_config:
+        try:
+            ensure_bucket_exists()
+        except Exception as e:
+            app.logger.warning(f"Could not initialize MinIO bucket on startup: {e}")
 
     # Register authentication middleware (protects all routes by default except exempt routes)
     register_auth_middleware(app)
