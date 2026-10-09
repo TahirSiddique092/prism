@@ -64,3 +64,43 @@ def insert_chunks(doc_id: int, chunks_list: list, conn=None):
     finally:
         if should_close and conn:
             conn.close()
+
+import os
+import psycopg2
+
+def get_postgres_conn():
+    url = os.getenv("POSTGRES_URL")
+    if url:
+        return psycopg2.connect(url)
+    return None
+
+def get_chunks_for_document(doc_id: int, conn=None):
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT chunk_id, chunk_text FROM chunks WHERE doc_id = %s ORDER BY chunk_index", (doc_id,))
+        results = cursor.fetchall()
+        cursor.close()
+        return results
+    finally:
+        if should_close and conn:
+            conn.close()
+
+def delete_chunks(doc_id: int, conn=None):
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM chunks WHERE doc_id = %s", (doc_id,))
+        conn.commit()
+        cursor.close()
+    finally:
+        if should_close and conn:
+            conn.close()
