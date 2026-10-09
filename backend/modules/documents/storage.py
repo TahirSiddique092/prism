@@ -40,3 +40,24 @@ def upload_file(file_obj, object_name: str, content_type: str = "application/pdf
         ExtraArgs={"ContentType": content_type}
     )
     return object_name
+
+def delete_file(object_name: str) -> bool:
+    """Delete an object from the MinIO documents bucket."""
+    s3 = get_s3_client()
+    try:
+        s3.delete_object(Bucket=BUCKET_NAME, Key=object_name)
+        return True
+    except ClientError as e:
+        error_code = str(e.response.get("Error", {}).get("Code"))
+        if error_code in ("404", "NoSuchKey"):
+            return True
+        raise
+
+def generate_presigned_url(object_name: str, expires_in: int = 3600) -> str:
+    """Generate a temporary pre-signed URL to view the object in MinIO."""
+    s3 = get_s3_client()
+    return s3.generate_presigned_url(
+        ClientMethod="get_object",
+        Params={"Bucket": BUCKET_NAME, "Key": object_name},
+        ExpiresIn=expires_in,
+    )
