@@ -26,3 +26,41 @@ def insert_document(user_id: int, title: str, minio_key: str, conn=None) -> int:
     finally:
         if should_close and conn:
             conn.close()
+
+def update_document_status(doc_id: int, status: str, conn=None):
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        query = "UPDATE documents SET status = %s WHERE doc_id = %s"
+        cursor.execute(query, (status, doc_id))
+        conn.commit()
+        cursor.close()
+    finally:
+        if should_close and conn:
+            conn.close()
+
+def insert_chunks(doc_id: int, chunks_list: list, conn=None):
+    """Bulk insert chunks for a document."""
+    if not chunks_list:
+        return
+        
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        query = "INSERT INTO chunks (doc_id, chunk_text, chunk_index) VALUES (%s, %s, %s)"
+        # chunks_list is a list of strings
+        data = [(doc_id, text, idx) for idx, text in enumerate(chunks_list)]
+        cursor.executemany(query, data)
+        conn.commit()
+        cursor.close()
+    finally:
+        if should_close and conn:
+            conn.close()
