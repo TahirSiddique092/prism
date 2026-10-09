@@ -15,10 +15,12 @@ try:
     from backend.modules.auth import auth_bp, register_auth_middleware
     from backend.modules.documents.routes import documents_bp
     from backend.modules.documents.storage import ensure_bucket_exists
+    from backend.modules.documents import embed
 except ImportError:
     from modules.auth import auth_bp, register_auth_middleware
     from modules.documents.routes import documents_bp
     from modules.documents.storage import ensure_bucket_exists
+    from modules.documents import embed
 
 
 def create_app(test_config=None):
