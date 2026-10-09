@@ -61,6 +61,15 @@ def upload_document():
     except Exception as e:
         return jsonify({"error": f"Database error: {str(e)}"}), 500
         
+    # 6. Trigger background chunking task
+    try:
+        from backend.modules.documents.worker import process_document
+        import threading
+        threading.Thread(target=process_document, args=(doc_id, minio_key)).start()
+    except Exception as e:
+        # We don't fail the upload if background task fails to start, but we should log it
+        print(f"Warning: Failed to start background task for doc {doc_id}: {e}")
+        
     return jsonify({
         "doc_id": doc_id,
         "minio_key": minio_key
