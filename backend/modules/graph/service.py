@@ -39,6 +39,18 @@ MERGE (d)-[:ABOUT]->(t)
 """
 
 
+# Related documents by shared topics (Slice 13). Both the source document (d1)
+# and each candidate (d2) must be UPLOADED by the same user, so results are
+# scoped to the authenticated user's documents only.
+RELATED_CYPHER = """
+MATCH (u:User {user_id: $user_id})-[:UPLOADED]->(d1:Document {doc_id: $doc_id})-[:ABOUT]->(t:Topic)<-[:ABOUT]-(d2:Document)<-[:UPLOADED]-(u)
+WHERE d2.doc_id <> $doc_id
+RETURN d2.doc_id AS doc_id, d2.title AS title, COUNT(t) AS shared_topics
+ORDER BY shared_topics DESC
+LIMIT $limit
+"""
+
+
 def normalize_topics(topics) -> list:
     """Trim, lowercase, drop empties, and de-duplicate topic names (order-preserving)."""
     seen = set()
@@ -78,6 +90,39 @@ def sync_document_to_graph(user_id, email, doc_id, title, topics) -> bool:
     except Exception as e:
         logger.warning("Graph write failed for doc %s: %s", doc_id, e)
         return False
+
+
+def get_related_documents(doc_id, user_id, limit=5) -> list:
+    """Return documents that share the most topics with ``doc_id`` (Slice 13).
+
+    Scoped to the authenticated user's own documents. Returns a list of
+    ``{doc_id, title, shared_topics}`` ordered by shared_topics descending,
+    capped at ``limit``. Returns [] (never raises) if Neo4j is unconfigured or
+    unreachable, or if there are no related documents.
+    """
+    try:
+        driver = get_driver()
+        if driver is None:
+            logger.warning("Neo4j not configured; returning no related docs for %s", doc_id)
+            return []
+        with driver.session() as session:
+            result = session.run(
+                RELATED_CYPHER,
+                doc_id=doc_id,
+                user_id=user_id,
+                limit=limit,
+            )
+            return [
+                {
+                    "doc_id": record["doc_id"],
+                    "title": record["title"],
+                    "shared_topics": record["shared_topics"],
+                }
+                for record in result
+            ]
+    except Exception as e:
+        logger.warning("Related-documents query failed for doc %s: %s", doc_id, e)
+        return []
 
 
 def write_document_to_graph_async(user_id, email, doc_id, title, topics, sync=False):

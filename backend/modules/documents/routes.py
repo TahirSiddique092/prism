@@ -18,7 +18,7 @@ try:
         delete_chunk_vectors,
     )
     from backend.modules.cache import invalidate_user_cache
-    from backend.modules.graph import write_document_to_graph_async
+    from backend.modules.graph import write_document_to_graph_async, get_related_documents
 except ImportError:
     from modules.documents.storage import (
         upload_file,
@@ -33,7 +33,7 @@ except ImportError:
         delete_chunk_vectors,
     )
     from modules.cache import invalidate_user_cache
-    from modules.graph import write_document_to_graph_async
+    from modules.graph import write_document_to_graph_async, get_related_documents
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +107,30 @@ def get_document_view_url(doc_id: int):
     except Exception as e:
         logger.error(f"Error retrieving view url for doc {doc_id}: {e}")
         return jsonify({"error": f"Failed to retrieve document view URL: {str(e)}"}), 500
+
+@documents_bp.route("/<int:doc_id>/related", methods=["GET"])
+def get_related_documents_route(doc_id: int):
+    """Find documents that share the most topics with this one (Slice 13).
+
+    Response: [{ doc_id, title, shared_topics }] — up to 5, ordered by shared
+    topic count descending, scoped to the authenticated user's documents.
+    Returns 404 if the document does not exist or belong to the user.
+    Returns [] (not an error) when there are no related documents.
+    """
+    user_id = g.user_id
+    try:
+        # Ownership is authoritative in MySQL — 404 if the doc isn't the user's.
+        doc = get_document_by_id(doc_id, user_id=user_id)
+        if not doc:
+            return jsonify({"error": "Document not found"}), 404
+
+        # get_related_documents degrades gracefully to [] on any Neo4j failure.
+        related = get_related_documents(doc_id, user_id)
+        return jsonify(related), 200
+    except Exception as e:
+        logger.error(f"Error retrieving related docs for doc {doc_id}: {e}")
+        return jsonify({"error": f"Failed to retrieve related documents: {str(e)}"}), 500
+
 
 @documents_bp.route("/<int:doc_id>", methods=["DELETE"])
 def delete_document_route(doc_id: int):
