@@ -11,7 +11,7 @@ Neo4j topic graph populated on upload, related documents queryable via Cypher, a
 - [x]  `slice-12-neo4j-topic-graph` — Neo4j topic graph on upload — **Dev A**
 - [x]  `slice-13-related-documents` — Related documents via Cypher — **Dev A**
 - [x]  `slice-14-analytics-search-history` — Analytics search history with window functions — **Dev B**
-- [ ]  `slice-15-analytics-unsearched-topdocs` — Analytics unsearched docs CTE and top documents view — **Dev B**
+- [x]  `slice-15-analytics-unsearched-topdocs` — Analytics unsearched docs CTE and top documents view — **Dev B**
 
 ## Depends on
 
