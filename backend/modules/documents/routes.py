@@ -1,6 +1,7 @@
+import json
 import logging
 import uuid
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 from werkzeug.utils import secure_filename
 
 try:
@@ -17,6 +18,7 @@ try:
         delete_chunk_vectors,
     )
     from backend.modules.cache import invalidate_user_cache
+    from backend.modules.graph import write_document_to_graph_async
 except ImportError:
     from modules.documents.storage import (
         upload_file,
@@ -31,12 +33,43 @@ except ImportError:
         delete_chunk_vectors,
     )
     from modules.cache import invalidate_user_cache
+    from modules.graph import write_document_to_graph_async
 
 logger = logging.getLogger(__name__)
 
 documents_bp = Blueprint("documents", __name__, url_prefix="/api/documents")
 
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
+
+
+def _parse_topics_from_form():
+    """Extract topic tags from the upload form.
+
+    Accepts repeated `topics` / `topics[]` fields, a single JSON-array string,
+    or comma-separated values. Returns a flat list of raw strings; normalisation
+    (trim/lowercase/dedupe) happens in the graph module.
+    """
+    raw = request.form.getlist("topics") + request.form.getlist("topics[]")
+    topics = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        s = item.strip()
+        if not s:
+            continue
+        if s.startswith("["):
+            try:
+                parsed = json.loads(s)
+                if isinstance(parsed, list):
+                    topics.extend(str(x) for x in parsed)
+                    continue
+            except (ValueError, TypeError):
+                pass
+        if "," in s:
+            topics.extend(part for part in s.split(","))
+        else:
+            topics.append(s)
+    return topics
 
 @documents_bp.route("", methods=["GET"], strict_slashes=False)
 def list_documents():
@@ -177,8 +210,24 @@ def upload_document():
         invalidate_user_cache(user_id)
     except Exception as e:
         logger.warning(f"Failed to invalidate cache after upload for user {user_id}: {e}")
-        
-    # 6. Trigger background chunking task
+
+    # 6. Write the topic graph to Neo4j (non-blocking; failure never fails upload)
+    try:
+        topics = _parse_topics_from_form()
+        email = g.user.get("email") if getattr(g, "user", None) else None
+        sync_graph = current_app.config.get("GRAPH_WRITE_SYNC", False)
+        write_document_to_graph_async(
+            user_id=user_id,
+            email=email,
+            doc_id=doc_id,
+            title=title,
+            topics=topics,
+            sync=sync_graph,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to dispatch graph write for doc {doc_id}: {e}")
+
+    # 7. Trigger background chunking task
     try:
         from backend.modules.documents.worker import process_document
         import threading
