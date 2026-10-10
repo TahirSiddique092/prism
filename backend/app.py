@@ -16,11 +16,13 @@ try:
     from backend.modules.documents.routes import documents_bp
     from backend.modules.documents.storage import ensure_bucket_exists
     from backend.modules.documents import embed
+    from backend.modules.search import search_bp
 except ImportError:
     from modules.auth import auth_bp, register_auth_middleware
     from modules.documents.routes import documents_bp
     from modules.documents.storage import ensure_bucket_exists
     from modules.documents import embed
+    from modules.search import search_bp
 
 
 def create_app(test_config=None):
@@ -33,6 +35,7 @@ def create_app(test_config=None):
     # Register blueprints
     app.register_blueprint(auth_bp)
     app.register_blueprint(documents_bp)
+    app.register_blueprint(search_bp)
     
     if not test_config:
         try:
