@@ -142,3 +142,130 @@ def get_chunks_metadata(chunk_ids: list[int], conn=None) -> dict[int, dict]:
     finally:
         if should_close and conn:
             conn.close()
+
+
+def search_chunks_fulltext(
+    user_id: int,
+    query: str,
+    limit: int = 10,
+    conn=None,
+) -> list[dict]:
+    """Execute MySQL FULLTEXT search against chunks table filtered to user's documents (Slice 10).
+    
+    AC:
+    - Triggered when best cosine distance from pgvector exceeds 0.75.
+    - Run: SELECT chunk_id, chunk_text FROM chunks WHERE MATCH(chunk_text) AGAINST(:query IN NATURAL LANGUAGE MODE)
+    - Filter to current user's documents only.
+    - Return results in same response shape as semantic search:
+      [{ chunk_id, doc_id, doc_title, snippet, score: None }]
+    """
+    clean_query = query.strip()
+    if not clean_query:
+        return []
+
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        try:
+            cursor = conn.cursor(dictionary=True)
+        except TypeError:
+            cursor = conn.cursor()
+
+        query_sql = """
+            SELECT 
+                c.chunk_id, 
+                c.doc_id, 
+                d.title AS doc_title, 
+                c.chunk_text AS snippet
+            FROM chunks c
+            JOIN documents d ON c.doc_id = d.doc_id
+            WHERE d.user_id = %s
+              AND MATCH(c.chunk_text) AGAINST(%s IN NATURAL LANGUAGE MODE)
+            LIMIT %s
+        """
+        cursor.execute(query_sql, (user_id, clean_query, limit))
+        rows = cursor.fetchall()
+        cursor.close()
+
+        results = []
+        for row in rows:
+            if isinstance(row, dict):
+                results.append({
+                    "chunk_id": int(row["chunk_id"]),
+                    "doc_id": int(row["doc_id"]),
+                    "doc_title": str(row["doc_title"]),
+                    "snippet": str(row["snippet"]),
+                    "score": None,
+                })
+            else:
+                results.append({
+                    "chunk_id": int(row[0]),
+                    "doc_id": int(row[1]),
+                    "doc_title": str(row[2]),
+                    "snippet": str(row[3]),
+                    "score": None,
+                })
+        return results
+    finally:
+        if should_close and conn:
+            conn.close()
+
+
+def insert_search_log(user_id: int, query_text: str, conn=None) -> int:
+    """Insert a single search record into search_log in MySQL (Slice 10).
+    
+    Returns the generated log_id.
+    """
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        query = "INSERT INTO search_log (user_id, query_text) VALUES (%s, %s)"
+        cursor.execute(query, (user_id, query_text))
+        if hasattr(conn, "commit"):
+            conn.commit()
+        log_id = cursor.lastrowid
+        cursor.close()
+        return log_id
+    finally:
+        if should_close and conn:
+            conn.close()
+
+
+def insert_search_results(log_id: int, results: list[dict], conn=None) -> None:
+    """Insert search result rows into search_results linked to log_id with rank 1..10 (Slice 10).
+    
+    Each result dict contains chunk_id and optional score (None for fallback).
+    """
+    if not results or not log_id:
+        return
+
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        query = """
+            INSERT INTO search_results (log_id, chunk_id, rank, similarity_score)
+            VALUES (%s, %s, %s, %s)
+        """
+        records = [
+            (log_id, res["chunk_id"], rank, res.get("score"))
+            for rank, res in enumerate(results[:10], start=1)
+        ]
+        cursor.executemany(query, records)
+        if hasattr(conn, "commit"):
+            conn.commit()
+        cursor.close()
+    finally:
+        if should_close and conn:
+            conn.close()
+

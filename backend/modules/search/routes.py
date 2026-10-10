@@ -1,14 +1,14 @@
-"""Search routes for PRISM (Slice 09).
+"""Search routes for PRISM (Slice 09 & 10).
 
-Exposes POST /api/search for semantic search over user documents.
+Exposes POST /api/search for semantic search with FULLTEXT fallback and logging.
 """
 import logging
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 
 try:
-    from backend.modules.search.service import execute_semantic_search
+    from backend.modules.search.service import execute_semantic_search, log_search_async
 except ImportError:
-    from modules.search.service import execute_semantic_search
+    from modules.search.service import execute_semantic_search, log_search_async
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +31,20 @@ def search():
         return jsonify({"error": "Query string is required and cannot be empty"}), 400
 
     user_id = g.user_id
+    clean_query = query.strip()
 
     try:
-        results = execute_semantic_search(user_id=user_id, query=query.strip(), limit=10)
+        results = execute_semantic_search(user_id=user_id, query=clean_query, limit=10)
+
+        # Slice 10: Non-blocking search logging to search_log and search_results
+        try:
+            sync_logging = current_app.config.get("SEARCH_LOGGING_SYNC", False)
+            log_search_async(user_id=user_id, query=clean_query, results=results, sync=sync_logging)
+        except Exception as log_err:
+            logger.error(f"Failed to dispatch search logging for user {user_id}: {log_err}", exc_info=True)
+
         return jsonify(results), 200
     except Exception as e:
         logger.error(f"Error executing search for user {user_id}: {e}", exc_info=True)
         return jsonify({"error": f"Failed to execute search: {str(e)}"}), 500
+
