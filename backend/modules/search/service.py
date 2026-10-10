@@ -1,7 +1,7 @@
 """Semantic search service with pgvector, FULLTEXT fallback, Redis caching, and logging (Slice 09 & 10)."""
 import logging
 import threading
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 VECTOR_SIMILARITY_THRESHOLD = 0.75
 
@@ -31,9 +31,12 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-def execute_semantic_search(user_id: int, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+def execute_semantic_search(user_id: int, query: str, limit: int = 10) -> Tuple[List[Dict[str, Any]], bool]:
     """Execute semantic vector search with caching and multi-tenant scoping.
-    
+
+    Returns a ``(results, cached)`` tuple, where ``cached`` is True only when the
+    results were served from the Redis cache without touching pgvector.
+
     Workflow:
     1. Check Redis cache first — if hit, return cached result immediately.
     2. Retrieve user's document IDs to ensure isolation to authenticated user.
@@ -47,25 +50,25 @@ def execute_semantic_search(user_id: int, query: str, limit: int = 10) -> List[D
     """
     clean_query = query.strip()
     if not clean_query:
-        return []
+        return [], False
 
     # 1. Check Redis cache before computing embedding
     cached_results = get_cached_search(user_id, clean_query)
     if cached_results is not None:
         logger.info(f"Cache hit for search query: '{clean_query}' (user_id={user_id})")
-        return cached_results
+        return cached_results, True
 
     # 2. Get user's document IDs from MySQL
     user_doc_ids = get_user_document_ids(user_id)
     if not user_doc_ids:
         # User has no documents uploaded yet
         set_cached_search(user_id, clean_query, [])
-        return []
+        return [], False
 
     # 3. Compute query embedding
     query_embeddings = get_embeddings([clean_query])
     if not query_embeddings:
-        return []
+        return [], False
     query_vec = query_embeddings[0]
 
     # 4. Search pgvector for top matches belonging to user's documents
@@ -87,7 +90,7 @@ def execute_semantic_search(user_id: int, query: str, limit: int = 10) -> List[D
         )
         fallback_results = search_chunks_fulltext(user_id=user_id, query=clean_query, limit=limit)
         set_cached_search(user_id, clean_query, fallback_results, ttl=3600)
-        return fallback_results
+        return fallback_results, False
 
     # 6. Fetch chunk snippets and doc titles from MySQL for vector matches
     chunk_ids = [m["chunk_id"] for m in vector_matches]
@@ -110,7 +113,7 @@ def execute_semantic_search(user_id: int, query: str, limit: int = 10) -> List[D
     # 8. Write to cache
     set_cached_search(user_id, clean_query, results, ttl=3600)
 
-    return results
+    return results, False
 
 
 def log_search(user_id: int, query: str, results: list[dict], conn=None) -> int | None:

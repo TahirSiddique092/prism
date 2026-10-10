@@ -20,7 +20,8 @@ def search():
     """POST /api/search
     
     Request body: { "query": "plain English query" }
-    Response: [{ chunk_id, doc_id, doc_title, snippet, score }]
+    Response: { "results": [{ chunk_id, doc_id, doc_title, snippet, score }],
+                "cached": true|false }
     """
     data = request.get_json(silent=True)
     if not data or not isinstance(data, dict):
@@ -34,7 +35,7 @@ def search():
     clean_query = query.strip()
 
     try:
-        results = execute_semantic_search(user_id=user_id, query=clean_query, limit=10)
+        results, cached = execute_semantic_search(user_id=user_id, query=clean_query, limit=10)
 
         # Slice 10: Non-blocking search logging to search_log and search_results
         try:
@@ -43,7 +44,7 @@ def search():
         except Exception as log_err:
             logger.error(f"Failed to dispatch search logging for user {user_id}: {log_err}", exc_info=True)
 
-        return jsonify(results), 200
+        return jsonify({"results": results, "cached": cached}), 200
     except Exception as e:
         logger.error(f"Error executing search for user {user_id}: {e}", exc_info=True)
         return jsonify({"error": f"Failed to execute search: {str(e)}"}), 500
