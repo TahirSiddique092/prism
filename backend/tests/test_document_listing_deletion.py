@@ -368,16 +368,19 @@ def test_raw_sql_delete_chunk_vectors_contract():
 
 
 def test_redis_cache_invalidation_contract():
-    """Verify invalidate_user_cache deletes all search:{user_id}:* keys."""
+    """Verify invalidate_user_cache deletes all search:{user_id}:* keys.
+
+    Uses non-blocking SCAN (scan_iter) rather than the blocking KEYS command.
+    """
     from backend.modules.cache.service import invalidate_user_cache
 
     mock_redis = MagicMock()
-    mock_redis.keys.return_value = ["search:1:hash1", "search:1:hash2"]
+    mock_redis.scan_iter.return_value = iter(["search:1:hash1", "search:1:hash2"])
 
     with patch("backend.modules.cache.service.get_redis_client", return_value=mock_redis):
         result = invalidate_user_cache(user_id=1)
         assert result is True
-        mock_redis.keys.assert_called_once_with("search:1:*")
+        mock_redis.scan_iter.assert_called_once_with(match="search:1:*", count=100)
         mock_redis.delete.assert_called_once_with("search:1:hash1", "search:1:hash2")
 
 

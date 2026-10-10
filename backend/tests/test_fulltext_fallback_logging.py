@@ -89,7 +89,7 @@ def test_fallback_triggered_when_vector_scores_exceed_threshold(client, user1_to
         )
 
         assert res.status_code == 200
-        data = res.get_json()
+        data = res.get_json()["results"]
         assert len(data) == 1
         assert data[0]["chunk_id"] == 50
         assert data[0]["doc_title"] == "Database Systems.pdf"
@@ -129,7 +129,7 @@ def test_fallback_not_triggered_when_vector_score_is_below_threshold(client, use
         )
 
         assert res.status_code == 200
-        data = res.get_json()
+        data = res.get_json()["results"]
         assert len(data) == 2
         assert data[0]["chunk_id"] == 20
         assert data[0]["score"] == 0.35
@@ -163,7 +163,7 @@ def test_fallback_triggered_when_vector_search_returns_empty(client, user1_token
         )
 
         assert res.status_code == 200
-        data = res.get_json()
+        data = res.get_json()["results"]
         assert len(data) == 1
         assert data[0]["chunk_id"] == 30
         assert data[0]["score"] is None
@@ -188,7 +188,7 @@ def test_fallback_zero_results_when_fulltext_finds_nothing(client, user1_token):
         )
 
         assert res.status_code == 200
-        assert res.get_json() == []
+        assert res.get_json() == {"results": [], "cached": False}
 
 
 # ============================================================================
@@ -220,7 +220,7 @@ def test_fulltext_results_filtered_to_current_user_only(client, user1_token, use
             headers={"Authorization": f"Bearer {user1_token}"},
         )
         assert res1.status_code == 200
-        data1 = res1.get_json()
+        data1 = res1.get_json()["results"]
         assert len(data1) == 1
         assert data1[0]["doc_id"] == 1
         assert data1[0]["chunk_id"] == 101
@@ -232,7 +232,7 @@ def test_fulltext_results_filtered_to_current_user_only(client, user1_token, use
             headers={"Authorization": f"Bearer {user2_token}"},
         )
         assert res2.status_code == 200
-        data2 = res2.get_json()
+        data2 = res2.get_json()["results"]
         assert len(data2) == 1
         assert data2[0]["doc_id"] == 2
         assert data2[0]["chunk_id"] == 201
@@ -299,7 +299,7 @@ def test_every_search_produces_one_search_log_row(client, user1_token):
     """AC 3: Every POST /api/search call produces exactly one search_log row."""
     fake_results = [{"chunk_id": 1, "doc_id": 1, "score": 0.2}]
 
-    with patch("backend.modules.search.routes.execute_semantic_search", return_value=fake_results), \
+    with patch("backend.modules.search.routes.execute_semantic_search", return_value=(fake_results, False)), \
          patch("backend.modules.search.routes.log_search_async") as mock_log_async:
 
         res = client.post(
@@ -427,7 +427,7 @@ def test_logging_failure_does_not_cause_search_response_to_fail(client, user1_to
     """
     fake_results = [{"chunk_id": 5, "doc_id": 1, "doc_title": "Doc", "snippet": "Text", "score": 0.25}]
 
-    with patch("backend.modules.search.routes.execute_semantic_search", return_value=fake_results), \
+    with patch("backend.modules.search.routes.execute_semantic_search", return_value=(fake_results, False)), \
          patch("backend.modules.search.service.insert_search_log", side_effect=Exception("Database connection lost")):
 
         res = client.post(
@@ -438,7 +438,7 @@ def test_logging_failure_does_not_cause_search_response_to_fail(client, user1_to
 
         # Search response MUST NOT fail
         assert res.status_code == 200
-        assert res.get_json() == fake_results
+        assert res.get_json() == {"results": fake_results, "cached": False}
 
 
 def test_log_search_function_catches_all_exceptions():

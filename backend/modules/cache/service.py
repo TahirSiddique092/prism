@@ -69,7 +69,8 @@ def invalidate_user_cache(user_id: int) -> bool:
     try:
         r = get_redis_client()
         pattern = f"search:{user_id}:*"
-        keys = r.keys(pattern)
+        # SCAN instead of KEYS: non-blocking, safe on large keyspaces in production.
+        keys = list(r.scan_iter(match=pattern, count=100))
         if keys:
             r.delete(*keys)
         return True

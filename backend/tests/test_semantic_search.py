@@ -114,7 +114,8 @@ def test_search_cache_hit_skips_embedding_and_database(client, user1_token):
         )
 
         assert res.status_code == 200
-        assert res.get_json() == cached_payload
+        # Response is wrapped: { results, cached }. A cache hit sets cached=True.
+        assert res.get_json() == {"results": cached_payload, "cached": True}
 
         # Cache must be checked
         mock_cache_get.assert_called_once_with(1, "neural networks")
@@ -149,7 +150,10 @@ def test_search_cache_miss_populates_cache(client, user1_token):
         )
 
         assert res.status_code == 200
-        data = res.get_json()
+        body = res.get_json()
+        # Cache miss -> cached=False
+        assert body["cached"] is False
+        data = body["results"]
         assert len(data) == 1
         assert data[0]["chunk_id"] == 101
         assert data[0]["doc_title"] == "Biology 101.pdf"
@@ -206,7 +210,7 @@ def test_search_results_filtered_to_authenticated_user_only(client, user1_token,
             headers={"Authorization": f"Bearer {user1_token}"},
         )
         assert res1.status_code == 200
-        data1 = res1.get_json()
+        data1 = res1.get_json()["results"]
         assert len(data1) == 1
         assert data1[0]["doc_id"] == 10
         assert data1[0]["doc_title"] == "Doc1.pdf"
@@ -219,7 +223,7 @@ def test_search_results_filtered_to_authenticated_user_only(client, user1_token,
             headers={"Authorization": f"Bearer {user2_token}"},
         )
         assert res2.status_code == 200
-        data2 = res2.get_json()
+        data2 = res2.get_json()["results"]
         assert len(data2) == 1
         assert data2[0]["doc_id"] == 20
         assert data2[0]["doc_title"] == "Secret.pdf"
@@ -240,7 +244,7 @@ def test_search_user_with_no_documents_returns_empty_list(client, user1_token):
         )
 
         assert res.status_code == 200
-        assert res.get_json() == []
+        assert res.get_json() == {"results": [], "cached": False}
         mock_embed.assert_not_called()
         mock_pg.assert_not_called()
 
@@ -315,7 +319,7 @@ def test_search_score_is_raw_cosine_distance_ordered(client, user1_token):
         )
 
         assert res.status_code == 200
-        data = res.get_json()
+        data = res.get_json()["results"]
         assert len(data) == 3
         assert [d["score"] for d in data] == [0.15, 0.38, 0.72]
         # Lower score = first in list
