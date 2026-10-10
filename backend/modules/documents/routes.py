@@ -5,9 +5,11 @@ from werkzeug.utils import secure_filename
 try:
     from backend.modules.documents.storage import upload_file
     from backend.modules.documents.db import insert_document
+    from backend.modules.cache import invalidate_user_cache
 except ImportError:
     from modules.documents.storage import upload_file
     from modules.documents.db import insert_document
+    from modules.cache import invalidate_user_cache
 
 documents_bp = Blueprint("documents", __name__, url_prefix="/api/documents")
 
@@ -60,8 +62,12 @@ def upload_document():
         doc_id = insert_document(user_id=user_id, title=title, minio_key=minio_key)
     except Exception as e:
         return jsonify({"error": f"Database error: {str(e)}"}), 500
-        
-    # 6. Trigger background chunking task
+
+    # 6. Invalidate this user's search cache — new content may change results.
+    # Degrades gracefully: a cache failure must never fail the upload.
+    invalidate_user_cache(user_id)
+
+    # 7. Trigger background chunking task
     try:
         from backend.modules.documents.worker import process_document
         import threading
