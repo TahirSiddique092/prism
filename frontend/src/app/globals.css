@@ -838,3 +838,102 @@ dialog.prism-dialog::backdrop {
   justify-content: flex-end;
   gap: 12px;
 }
+
+/* Analytics Subnav & Pages (slice-19) */
+.analytics-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--color-border-default);
+  margin-bottom: 28px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.analytics-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.analytics-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.analytics-tab:hover {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.analytics-tab.active {
+  color: #60a5fa;
+  font-weight: 600;
+  border-bottom-color: var(--color-primary);
+  background: var(--color-primary-tint);
+}
+
+.analytics-nudge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  margin-bottom: 24px;
+}
+
+.analytics-nudge svg {
+  flex-shrink: 0;
+  color: #60a5fa;
+}
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono, monospace);
+}
+
+.count-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: var(--radius-sm);
+  color: #93c5fd;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.table-query-link {
+  color: var(--color-text-primary);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.table-query-link:hover {
+  color: #60a5fa;
+  text-decoration: underline;
+}
