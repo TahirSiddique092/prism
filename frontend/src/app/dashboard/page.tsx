@@ -1,36 +1,72 @@
-import PrismLogo from "@/components/PrismLogo";
+import { Suspense } from "react";
+import { cookies } from "next/headers";
+import AppHeader from "@/components/AppHeader";
+import DashboardClient, { type DocumentItem } from "./DashboardClient";
+import { AUTH_COOKIE, getApiBaseUrl } from "@/lib/auth";
 
-import LogoutButton from "./LogoutButton";
+async function DashboardContent() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(AUTH_COOKIE)?.value;
+
+  let initialDocuments: DocumentItem[] = [];
+
+  if (token) {
+    try {
+      const res = await fetch(`${getApiBaseUrl()}/api/documents`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          initialDocuments = data;
+        }
+      }
+    } catch {
+      // Backend unavailable during SSR; client can retry or refresh
+      initialDocuments = [];
+    }
+  }
+
+  return <DashboardClient initialDocuments={initialDocuments} />;
+}
+
+function DashboardLoadingFallback() {
+  return (
+    <main className="main-content">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Document Library</h1>
+          <p className="page-subtitle">Loading your document collection…</p>
+        </div>
+      </div>
+      <div className="table-container" style={{ padding: 40, textAlign: "center" }}>
+        <span className="spinner" style={{ margin: "0 auto 12px" }} />
+        <p style={{ color: "var(--color-text-muted)", fontSize: "0.875rem" }}>
+          Retrieving documents…
+        </p>
+      </div>
+    </main>
+  );
+}
 
 /**
- * Placeholder dashboard — the redirect target for successful auth (slice-16).
+ * /dashboard — The user's home page (slice-17).
  *
- * This route is protected by middleware (unauthenticated visitors are sent to
- * /login). The full document-management dashboard is built in slice-17; this
- * stub exists so the auth flow has a real, protected landing page to verify
- * against.
+ * Shows the user's uploaded documents and a form to upload a new PDF with topic tags.
+ * Wrapped in Suspense to support Next 16 Cache Components and Partial Prerendering.
  */
 export default function DashboardPage() {
   return (
-    <main
-      style={{
-        maxWidth: 1200,
-        margin: "0 auto",
-        padding: "48px 24px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 24,
-        alignItems: "flex-start",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <PrismLogo size={32} />
-        <h1 style={{ fontSize: "1.5rem", fontWeight: 700 }}>Dashboard</h1>
-      </div>
-      <p style={{ color: "var(--color-text-muted)" }}>
-        You are signed in. Document management arrives in slice-17.
-      </p>
-      <LogoutButton />
-    </main>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <AppHeader />
+      <Suspense fallback={<DashboardLoadingFallback />}>
+        <DashboardContent />
+      </Suspense>
+    </div>
   );
 }
