@@ -10,8 +10,8 @@ All Next.js pages wired to the Flask API — auth, dashboard with upload, search
 
 - [x]  `slice-16-frontend-auth` — Auth pages (register and login) — **Dev A**
 - [x]  `slice-17-frontend-dashboard` — Dashboard (document list and upload form) — **Dev B**
-- [ ]  `slice-18-frontend-search` — Search page and result view — **Dev A**
-- [ ]  `slice-19-frontend-analytics` — Analytics pages (history, unsearched, top docs) — **Dev B**
+- [x]  `slice-18-frontend-search` — Search page and result view — **Dev A**
+- [x]  `slice-19-frontend-analytics` — Analytics pages (history, unsearched, top docs) — **Dev B**
 - [ ]  `slice-20-frontend-document-detail` — Document detail page with related documents — **Dev A**
 
 ## Depends on
