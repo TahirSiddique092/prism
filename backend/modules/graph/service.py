@@ -39,6 +39,17 @@ MERGE (d)-[:ABOUT]->(t)
 """
 
 
+# A single document's own topic tags (Slice 20). Scoped to the authenticated
+# user so one user can never read the topics of another user's document, even
+# if two users happen to share a doc_id space. Topic names are returned in a
+# stable alphabetical order for predictable rendering.
+DOCUMENT_TOPICS_CYPHER = """
+MATCH (u:User {user_id: $user_id})-[:UPLOADED]->(d:Document {doc_id: $doc_id})-[:ABOUT]->(t:Topic)
+RETURN t.name AS name
+ORDER BY t.name
+"""
+
+
 # Related documents by shared topics (Slice 13). Both the source document (d1)
 # and each candidate (d2) must be UPLOADED by the same user, so results are
 # scoped to the authenticated user's documents only.
@@ -90,6 +101,32 @@ def sync_document_to_graph(user_id, email, doc_id, title, topics) -> bool:
     except Exception as e:
         logger.warning("Graph write failed for doc %s: %s", doc_id, e)
         return False
+
+
+def get_document_topics(doc_id, user_id) -> list:
+    """Return the topic-tag names attached to ``doc_id`` (Slice 20).
+
+    Scoped to the authenticated user's own document. Returns an alphabetically
+    ordered list of topic-name strings. Returns [] (never raises) if Neo4j is
+    unconfigured or unreachable, or if the document has no topics. The caller is
+    responsible for the authoritative ownership/404 check in MySQL — this only
+    reads topics for a document already confirmed to belong to the user.
+    """
+    try:
+        driver = get_driver()
+        if driver is None:
+            logger.warning("Neo4j not configured; returning no topics for doc %s", doc_id)
+            return []
+        with driver.session() as session:
+            result = session.run(
+                DOCUMENT_TOPICS_CYPHER,
+                doc_id=doc_id,
+                user_id=user_id,
+            )
+            return [record["name"] for record in result]
+    except Exception as e:
+        logger.warning("Document-topics query failed for doc %s: %s", doc_id, e)
+        return []
 
 
 def get_related_documents(doc_id, user_id, limit=5) -> list:

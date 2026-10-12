@@ -937,3 +937,163 @@ dialog.prism-dialog::backdrop {
   color: #60a5fa;
   text-decoration: underline;
 }
+
+/*
+ * Document detail page (slice-20). Metadata header, topic tags, a two-column
+ * layout pairing the inline PDF viewer with the related-documents list, and a
+ * not-found state — all built on the shared card/badge tokens above.
+ */
+.detail-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  margin-bottom: 16px;
+  transition: color 0.15s ease;
+}
+
+.detail-back-link:hover {
+  color: var(--color-text-secondary);
+}
+
+.detail-meta-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  margin-bottom: 20px;
+}
+
+.detail-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-meta-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.detail-meta-value {
+  font-size: 0.9375rem;
+  color: var(--color-text-primary);
+}
+
+.detail-topics {
+  display: flex;
+  flex-direction: column;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.topic-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.topic-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: var(--color-primary-tint);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detail-viewer-body {
+  padding: 0;
+}
+
+.detail-pdf-frame {
+  display: block;
+  width: 100%;
+  height: 640px;
+  border: 0;
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+  background: #0a0f1d;
+}
+
+.detail-viewer-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  height: 640px;
+  padding: 24px;
+}
+
+.related-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.related-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-input);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.related-item:hover {
+  border-color: var(--color-border-default);
+  background: var(--color-bg-surface);
+}
+
+.related-item-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.related-shared {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--color-primary-tint);
+  color: #93c5fd;
+  white-space: nowrap;
+}
