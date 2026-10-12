@@ -172,6 +172,30 @@ def get_user_documents(user_id: int, conn=None) -> list[dict]:
         if should_close and conn:
             conn.close()
 
+def get_document_chunk_count(doc_id: int, conn=None) -> int:
+    """Return the number of chunks stored for a document (Slice 20).
+
+    Kept as its own explicit query so the document-detail endpoint can report a
+    chunk count without pulling the whole document list.
+    """
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM chunks WHERE doc_id = %s", (doc_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return 0
+        count = row[0]
+        return int(count) if count is not None else 0
+    finally:
+        if should_close and conn:
+            conn.close()
+
 def get_document_by_id(doc_id: int, user_id: int = None, conn=None) -> dict | None:
     """Retrieve document details by doc_id, optionally scoping by user_id."""
     should_close = False

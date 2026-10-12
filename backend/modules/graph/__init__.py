@@ -8,6 +8,7 @@ Public API:
 - write_document_to_graph_async(..., sync=False) -> Thread | None
 - normalize_topics(topics) -> list
 - get_related_documents(doc_id, user_id, limit=5) -> list (Slice 13)
+- get_document_topics(doc_id, user_id) -> list (Slice 20)
 """
 try:
     from backend.modules.graph.service import (
@@ -15,6 +16,7 @@ try:
         write_document_to_graph_async,
         normalize_topics,
         get_related_documents,
+        get_document_topics,
     )
 except ImportError:
     from modules.graph.service import (
@@ -22,6 +24,7 @@ except ImportError:
         write_document_to_graph_async,
         normalize_topics,
         get_related_documents,
+        get_document_topics,
     )
 
 __all__ = [
@@ -29,4 +32,5 @@ __all__ = [
     "write_document_to_graph_async",
     "normalize_topics",
     "get_related_documents",
+    "get_document_topics",
 ]

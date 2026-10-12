@@ -14,11 +14,16 @@ try:
         insert_document,
         get_user_documents,
         get_document_by_id,
+        get_document_chunk_count,
         delete_document,
         delete_chunk_vectors,
     )
     from backend.modules.cache import invalidate_user_cache
-    from backend.modules.graph import write_document_to_graph_async, get_related_documents
+    from backend.modules.graph import (
+        write_document_to_graph_async,
+        get_related_documents,
+        get_document_topics,
+    )
 except ImportError:
     from modules.documents.storage import (
         upload_file,
@@ -29,11 +34,16 @@ except ImportError:
         insert_document,
         get_user_documents,
         get_document_by_id,
+        get_document_chunk_count,
         delete_document,
         delete_chunk_vectors,
     )
     from modules.cache import invalidate_user_cache
-    from modules.graph import write_document_to_graph_async, get_related_documents
+    from modules.graph import (
+        write_document_to_graph_async,
+        get_related_documents,
+        get_document_topics,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +140,43 @@ def get_related_documents_route(doc_id: int):
     except Exception as e:
         logger.error(f"Error retrieving related docs for doc {doc_id}: {e}")
         return jsonify({"error": f"Failed to retrieve related documents: {str(e)}"}), 500
+
+
+@documents_bp.route("/<int:doc_id>", methods=["GET"])
+def get_document_detail(doc_id: int):
+    """Return a single document's metadata and topic tags (Slice 20).
+
+    Response: { doc_id, title, uploaded_at, status, chunk_count, topics }
+    - Ownership is authoritative in MySQL: 404 if the doc isn't the user's.
+    - topics come from Neo4j and degrade gracefully to [] on any graph failure,
+      so a down Neo4j never turns the detail page into an error.
+    """
+    user_id = g.user_id
+    try:
+        doc = get_document_by_id(doc_id, user_id=user_id)
+        if not doc:
+            return jsonify({"error": "Document not found"}), 404
+
+        uploaded_at_val = doc.get("uploaded_at")
+        if hasattr(uploaded_at_val, "isoformat"):
+            uploaded_at_str = uploaded_at_val.isoformat()
+        else:
+            uploaded_at_str = str(uploaded_at_val) if uploaded_at_val is not None else None
+
+        chunk_count = get_document_chunk_count(doc_id)
+        topics = get_document_topics(doc_id, user_id)
+
+        return jsonify({
+            "doc_id": doc["doc_id"],
+            "title": doc.get("title"),
+            "uploaded_at": uploaded_at_str,
+            "status": doc.get("status") or "ready",
+            "chunk_count": chunk_count,
+            "topics": topics,
+        }), 200
+    except Exception as e:
+        logger.error(f"Error retrieving document detail for doc {doc_id}: {e}")
+        return jsonify({"error": f"Failed to retrieve document: {str(e)}"}), 500
 
 
 @documents_bp.route("/<int:doc_id>", methods=["DELETE"])
