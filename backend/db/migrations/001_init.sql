@@ -52,7 +52,7 @@ CREATE TABLE search_results (
     result_id INT AUTO_INCREMENT PRIMARY KEY,
     log_id INT NOT NULL,
     chunk_id INT NOT NULL,
-    rank INT NOT NULL,
+    `rank` INT NOT NULL,
     similarity_score FLOAT,
     FOREIGN KEY (log_id) REFERENCES search_log(log_id) ON DELETE CASCADE,
     FOREIGN KEY (chunk_id) REFERENCES chunks(chunk_id) ON DELETE CASCADE

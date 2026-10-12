@@ -254,7 +254,7 @@ def insert_search_results(log_id: int, results: list[dict], conn=None) -> None:
     try:
         cursor = conn.cursor()
         query = """
-            INSERT INTO search_results (log_id, chunk_id, rank, similarity_score)
+            INSERT INTO search_results (log_id, chunk_id, `rank`, similarity_score)
             VALUES (%s, %s, %s, %s)
         """
         records = [
