@@ -62,8 +62,11 @@ def run_migrations():
                     cursor.execute(stmt)
             if len(statements) > 1:
                 trigger_block = statements[1].split("DELIMITER ;")[0].strip()
+                if trigger_block.endswith("//"):
+                    trigger_block = trigger_block[:-2].strip()
                 if trigger_block:
                     cursor.execute(trigger_block)
+            cursor.close()
 
         if postgres_script and pg_conn:
             with pg_conn.cursor() as cursor:
