@@ -23,8 +23,13 @@ def get_redis_client():
 
 
 def get_search_cache_key(user_id: int, query: str) -> str:
-    """Generate normalized cache key: search:{user_id}:{md5(query.strip().lower())}."""
-    normalized_query = query.strip().lower()
+    """Generate normalized cache key: search:{user_id}:{md5(normalized_query)}.
+
+    Normalisation lowercases, strips, and collapses internal whitespace so that
+    queries that differ only in spacing (e.g. "joins  in sql" vs "joins in sql")
+    resolve to the same cache entry.
+    """
+    normalized_query = " ".join(query.strip().lower().split())
     query_hash = hashlib.md5(normalized_query.encode("utf-8")).hexdigest()
     return f"search:{user_id}:{query_hash}"
 
