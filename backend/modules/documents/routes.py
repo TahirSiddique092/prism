@@ -228,24 +228,41 @@ def delete_document_route(doc_id: int):
         logger.error(f"Error deleting doc {doc_id}: {e}")
         return jsonify({"error": f"Failed to delete document: {str(e)}"}), 500
 
+# Browsers/clients sometimes send a generic content type for a genuine PDF;
+# the .pdf extension + accurate byte-size check below remain authoritative.
+ALLOWED_PDF_MIMETYPES = {
+    "application/pdf",
+    "application/octet-stream",
+    "application/x-pdf",
+    "binary/octet-stream",
+    "",
+}
+
+# Multipart framing (boundaries + field headers) adds a few KB on top of the
+# raw file bytes, so the Content-Length header guard allows a small margin and
+# the exact per-file check below is authoritative.
+MULTIPART_OVERHEAD = 1 * 1024 * 1024  # 1MB
+
+
 @documents_bp.route("/upload", methods=["POST"])
 def upload_document():
-    # 1. Size check via headers
-    if request.content_length and request.content_length > MAX_FILE_SIZE:
+    # 1. Coarse size guard via headers (avoids buffering a huge body); the exact
+    #    per-file check below is authoritative.
+    if request.content_length and request.content_length > MAX_FILE_SIZE + MULTIPART_OVERHEAD:
         return jsonify({"error": "File size limit exceeded (20MB max)"}), 413
-        
+
     if "file" not in request.files:
         return jsonify({"error": "No file part in the request"}), 400
-        
+
     file = request.files["file"]
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
-        
-    # 2. File type validation
+
+    # 2. File type validation — extension is authoritative; mimetype is advisory.
     if not file.filename.lower().endswith(".pdf"):
         return jsonify({"error": "Only .pdf files are accepted"}), 400
-        
-    if file.mimetype != "application/pdf":
+
+    if (file.mimetype or "").lower() not in ALLOWED_PDF_MIMETYPES:
         return jsonify({"error": "Invalid mime type, expected application/pdf"}), 400
 
     # 3. Size check via read (fallback if content_length is missing/spoofed)

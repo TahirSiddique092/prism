@@ -260,6 +260,16 @@ def test_semantic_embedding_zero_overlapping_words():
     correctly places semantically related text closer than unrelated text,
     even when they share 0 words.
     """
+    import sys
+
+    # This test exercises real embedding *quality*, so it requires the actual
+    # sentence-transformers model. In a lightweight environment conftest stubs
+    # the import with constant vectors — skip rather than fail there.
+    st = sys.modules.get("sentence_transformers")
+    model_cls = getattr(st, "SentenceTransformer", None)
+    if model_cls is None or getattr(model_cls, "__name__", "") == "_StubModel":
+        pytest.skip("real sentence-transformers model not installed (stubbed)")
+
     from backend.modules.documents.embed import get_embeddings
     import numpy as np
 

@@ -74,6 +74,26 @@ def get_postgres_conn():
         return psycopg2.connect(url)
     return None
 
+def get_document_owner(doc_id: int, conn=None):
+    """Return the user_id that owns a document, or None if it does not exist."""
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM documents WHERE doc_id = %s", (doc_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return None
+        return row[0]
+    finally:
+        if should_close and conn:
+            conn.close()
+
+
 def get_chunks_for_document(doc_id: int, conn=None):
     should_close = False
     if conn is None:
