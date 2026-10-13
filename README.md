@@ -22,7 +22,7 @@ Planning and documentation are complete. The product requirements, architecture,
 * **Sprint 3:** Search (Semantic search, FULLTEXT fallback, Redis cache)
 * **Sprint 4:** Graph and analytics (Neo4j topics, search analytics)
 * **Sprint 5:** Frontend UI wiring (Next.js)
-* **Sprint 6:** Polish and deployment (OCI VM & Vercel)
+* **Sprint 6:** Polish and deployment (Hugging Face Spaces + managed free tiers & Vercel — see `deploy/huggingface-setup.md`)
 
 ---
 
