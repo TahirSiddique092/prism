@@ -47,5 +47,5 @@ def search():
         return jsonify({"results": results, "cached": cached}), 200
     except Exception as e:
         logger.error(f"Error executing search for user {user_id}: {e}", exc_info=True)
-        return jsonify({"error": f"Failed to execute search: {str(e)}"}), 500
+        return jsonify({"error": "Failed to execute search"}), 500
 

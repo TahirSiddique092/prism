@@ -10,13 +10,37 @@ import jwt
 
 # 24-hour token lifetime as specified in slice-03 acceptance criteria
 TOKEN_EXPIRY_HOURS = 24
-# Fallback secret for development if JWT_SECRET is not explicitly set in the environment
+# Development-only fallback secret. NEVER used when PRISM_ENV/FLASK_ENV is
+# "production" — see get_jwt_secret() and backend.app._validate_security_config,
+# which hard-fail startup if a real JWT_SECRET is not configured in production.
 DEFAULT_DEV_SECRET = "prism-development-jwt-secret-key-at-least-32-chars-long"
+
+# bcrypt silently truncates input beyond 72 bytes, which would make two long
+# passwords sharing a 72-byte prefix interchangeable. We reject longer inputs
+# up front instead (see routes.register).
+MAX_PASSWORD_BYTES = 72
+
+
+def _is_production() -> bool:
+    env = os.getenv("PRISM_ENV") or os.getenv("FLASK_ENV") or ""
+    return env.strip().lower() == "production"
 
 
 def get_jwt_secret() -> str:
-    """Retrieve the JWT secret from environment variables."""
-    return os.getenv("JWT_SECRET", DEFAULT_DEV_SECRET)
+    """Retrieve the JWT signing secret.
+
+    In production (PRISM_ENV/FLASK_ENV == "production") a real JWT_SECRET is
+    mandatory — we refuse to fall back to the committed development secret, which
+    would otherwise let anyone forge tokens. In dev/test the fallback is used.
+    """
+    secret = os.getenv("JWT_SECRET")
+    if secret:
+        return secret
+    if _is_production():
+        raise RuntimeError(
+            "JWT_SECRET must be set in production; refusing to use the development fallback."
+        )
+    return DEFAULT_DEV_SECRET
 
 
 def hash_password(password: str) -> str:
