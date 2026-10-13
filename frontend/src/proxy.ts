@@ -8,13 +8,38 @@ import { AUTH_COOKIE, AUTH_ROUTES } from "@/lib/auth";
  *  - Unauthenticated users hitting any protected page  → redirected to /login
  *  - Authenticated users hitting /login or /register   → redirected to /dashboard
  *
- * Authentication is determined by the presence of the httpOnly JWT cookie.
- * Signature/expiry verification happens on the backend for every API call;
- * middleware only needs the coarse "is there a session" signal to gate pages.
+ * Authentication is determined by the presence of a JWT cookie whose `exp`
+ * claim is still in the future. The signature is still verified on the backend
+ * for every API call — middleware only parses `exp` (no secret needed) so that
+ * an expired-but-present cookie is treated as signed-out. Without this, an
+ * expired session leaves the user stranded on a protected page that silently
+ * fails every backend call instead of being sent to /login.
  */
+function hasActiveSession(token: string | undefined): boolean {
+  if (!token) return false;
+  // Reject ONLY when we can positively prove the token is an expired JWT. For
+  // anything we cannot parse (or that carries no exp claim) we fall back to the
+  // slice-16 presence-based signal — the backend still verifies the signature
+  // on every API call.
+  const parts = token.split(".");
+  if (parts.length === 3) {
+    try {
+      let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      b64 += "=".repeat((4 - (b64.length % 4)) % 4);
+      const payload = JSON.parse(atob(b64)) as { exp?: number };
+      if (typeof payload.exp === "number" && payload.exp * 1000 <= Date.now()) {
+        return false;
+      }
+    } catch {
+      // Not a parseable JWT payload — fall through to presence-based auth.
+    }
+  }
+  return true;
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isAuthenticated = Boolean(request.cookies.get(AUTH_COOKIE)?.value);
+  const isAuthenticated = hasActiveSession(request.cookies.get(AUTH_COOKIE)?.value);
   const isAuthRoute = AUTH_ROUTES.includes(pathname);
 
   // Signed-in users should never see the login/register screens.

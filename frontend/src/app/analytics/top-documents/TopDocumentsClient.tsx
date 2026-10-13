@@ -192,11 +192,14 @@ export default function TopDocumentsClient() {
                     </div>
                   </td>
                   <td style={{ textAlign: "right", fontFamily: "var(--font-mono, monospace)" }}>
-                    <span className="count-pill">{doc.appearance_count} searches</span>
+                    <span className="count-pill">{doc.appearance_count} appearances</span>
                   </td>
                   <td style={{ textAlign: "right", fontFamily: "var(--font-mono, monospace)" }}>
                     {doc.avg_score !== null && doc.avg_score !== undefined ? (
-                      <span className="result-score">{doc.avg_score.toFixed(4)}</span>
+                      // avg_score from the backend is average cosine DISTANCE
+                      // (lower = closer). Display it as a similarity (higher =
+                      // more relevant) so the column matches its "Similarity" label.
+                      <span className="result-score">{(1 - doc.avg_score).toFixed(4)}</span>
                     ) : (
                       <span style={{ color: "var(--color-text-muted)" }}>—</span>
                     )}
