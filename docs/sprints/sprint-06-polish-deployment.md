@@ -10,7 +10,7 @@ Query performance optimised with EXPLAIN analysis, backend deployed to OCI VM, f
 
 - [x]  `slice-21-index-tuning` — Index tuning and EXPLAIN analysis — **Dev B**
 - [x]  `slice-22-oci-deployment` — OCI VM deployment and environment setup — **Dev A**
-- [ ]  `slice-23-vercel-deployment` — Vercel deployment and CORS config — **Dev B**
+- [x]  `slice-23-vercel-deployment` — Vercel deployment and CORS config — **Dev B**
 
 ## Depends on
 

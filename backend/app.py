@@ -12,6 +12,7 @@ for path in (str(PROJECT_ROOT), str(CURRENT_DIR)):
         sys.path.insert(0, path)
 
 try:
+    from backend.cors import register_cors_middleware
     from backend.modules.auth import auth_bp, register_auth_middleware
     from backend.modules.documents.routes import documents_bp
     from backend.modules.documents.storage import ensure_bucket_exists
@@ -19,6 +20,7 @@ try:
     from backend.modules.search import search_bp
     from backend.modules.analytics import analytics_bp
 except ImportError:
+    from cors import register_cors_middleware
     from modules.auth import auth_bp, register_auth_middleware
     from modules.documents.routes import documents_bp
     from modules.documents.storage import ensure_bucket_exists
@@ -33,6 +35,9 @@ def create_app(test_config=None):
 
     if test_config:
         app.config.update(test_config)
+
+    # Register CORS middleware (Slice 23: Vercel-only domain policy)
+    register_cors_middleware(app)
 
     # Register blueprints
     app.register_blueprint(auth_bp)
