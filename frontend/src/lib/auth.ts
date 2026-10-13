@@ -16,11 +16,20 @@ export const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24;
 export const AUTH_ROUTES = ["/login", "/register"];
 
 /**
- * Base URL of the Flask API. Configurable via NEXT_PUBLIC_API_URL so the same
- * build works locally and on Vercel; defaults to the local dev backend.
+ * Base URL of the Flask API.
+ *
+ * getApiBaseUrl() is only ever called from server code (route handlers + server
+ * components), so we prefer a server-only runtime variable (`API_URL`): it is
+ * not inlined into the client bundle and can be changed in the host dashboard
+ * without a rebuild. We fall back to the build-time public `NEXT_PUBLIC_API_URL`
+ * (for backwards-compatibility and local dev), then to the local dev backend.
  */
 export function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+  return (
+    process.env.API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    "http://localhost:5000"
+  );
 }
 
 /**
