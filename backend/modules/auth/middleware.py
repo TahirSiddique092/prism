@@ -8,6 +8,7 @@ Provides:
 - register_auth_middleware: Enforces authentication across all routes by default,
   exempting /api/auth/register, /api/auth/login, and /health.
 """
+import logging
 from functools import wraps
 from flask import Flask, g, jsonify, request
 import jwt
@@ -16,6 +17,8 @@ try:
     from backend.modules.auth.service import decode_token
 except ImportError:
     from modules.auth.service import decode_token
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_EXEMPT_ROUTES = frozenset({
@@ -84,8 +87,20 @@ def authenticate_request():
             }),
             401,
         )
-    except (jwt.InvalidTokenError, Exception):
+    except jwt.InvalidTokenError:
         # Acceptance criteria: Missing or invalid token returns 401
+        return False, (
+            jsonify({
+                "error": "Invalid token",
+                "message": "Unauthorized",
+            }),
+            401,
+        )
+    except Exception as exc:
+        # An unexpected failure inside decode_token (not a normal invalid-token
+        # case) is still surfaced as 401 to the client, but logged so genuine
+        # server faults are not silently masked.
+        logger.warning(f"Unexpected error decoding token: {exc}", exc_info=True)
         return False, (
             jsonify({
                 "error": "Invalid token",

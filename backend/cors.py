@@ -10,8 +10,10 @@ from flask import Flask, Response, jsonify, request
 
 
 # Regex matching official Vercel deployment domains:
-# Covers production (e.g. https://prism.vercel.app), preview deployments, and branch URLs
-VERCEL_DOMAIN_REGEX = re.compile(r"^https://([a-zA-Z0-9-]+\.)*vercel\.app(?::\d+)?$")
+# Covers production (e.g. https://prism.vercel.app), preview deployments, and
+# branch URLs. Requires at least one subdomain label (so the bare apex
+# https://vercel.app is NOT trusted as an API origin).
+VERCEL_DOMAIN_REGEX = re.compile(r"^https://([a-zA-Z0-9-]+\.)+vercel\.app(?::\d+)?$")
 
 # Regex for local development origins (localhost / 127.0.0.1)
 DEV_ORIGIN_REGEX = re.compile(r"^http://(localhost|127\.0\.0\.1)(:\d+)?$")
@@ -60,6 +62,15 @@ def is_origin_allowed(origin: str | None, app: Flask | None = None) -> bool:
     if clean_origin in configured:
         return True
 
+    # Strict mode (opt-in for production): trust ONLY explicitly configured
+    # origins — do not accept the whole *.vercel.app space, since any tenant can
+    # deploy there. Enable with CORS_STRICT=true (env) or app.config CORS_STRICT.
+    strict = os.getenv("CORS_STRICT", "false").strip().lower() in ("true", "1", "yes")
+    if app is not None and app.config.get("CORS_STRICT"):
+        strict = True
+    if strict:
+        return False
+
     # Check Vercel domain pattern (*.vercel.app)
     if VERCEL_DOMAIN_REGEX.match(clean_origin):
         return True
@@ -105,6 +116,7 @@ def register_cors_middleware(app: Flask) -> None:
         if request.method == "OPTIONS":
             response = Response("", status=204)
             response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, HEAD"
             response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, X-Requested-With"
             response.headers["Access-Control-Allow-Credentials"] = "true"
@@ -117,6 +129,9 @@ def register_cors_middleware(app: Flask) -> None:
     def add_cors_headers(response: Response) -> Response:
         origin = request.headers.get("Origin")
         if origin and is_origin_allowed(origin, app):
+            # Response varies by Origin, so caches must key on it — otherwise a
+            # cached per-origin ACAO could be replayed to a different origin.
+            response.headers["Vary"] = "Origin"
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, HEAD"

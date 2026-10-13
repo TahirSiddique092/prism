@@ -10,7 +10,7 @@ from flask import Blueprint, jsonify, request
 
 from .db import create_user, find_user_by_email
 from .middleware import require_auth
-from .service import check_password, generate_token, hash_password
+from .service import MAX_PASSWORD_BYTES, check_password, generate_token, hash_password
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -40,6 +40,12 @@ def register():
             isinstance(email, str) and email.strip() and
             isinstance(password, str) and password.strip()):
         return jsonify({"error": "Missing required fields: name, email, and password are required"}), 400
+
+    # Reject passwords beyond bcrypt's 72-byte limit rather than letting bcrypt
+    # silently truncate them (which would make long passwords collide on their
+    # first 72 bytes).
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        return jsonify({"error": f"Password must be at most {MAX_PASSWORD_BYTES} bytes"}), 400
 
     name = name.strip()
     email = email.strip().lower()
