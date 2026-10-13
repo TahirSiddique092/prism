@@ -3,20 +3,51 @@ import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
 
-BUCKET_NAME = "prism-documents"
+
+def _setting(*names: str, default: str | None = None) -> str | None:
+    """Return the first set env var among ``names`` (new S3_* names preferred,
+    legacy MINIO_* kept for backwards-compatibility)."""
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return default
+
+
+# Bucket name is read at import (worker imports it); configurable for managed
+# object stores (Cloudflare R2 / Supabase Storage / MinIO).
+BUCKET_NAME = _setting("S3_BUCKET", "MINIO_BUCKET", default="prism-documents")
+
 
 def get_s3_client():
-    endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+    """Build an S3 client for any S3-compatible store (MinIO, Cloudflare R2,
+    Supabase Storage, AWS S3).
+
+    The endpoint scheme defaults to https for remote hosts (so pre-signed URLs
+    are https and load in the browser without mixed-content errors) and http
+    only for localhost dev.
+    """
+    endpoint = _setting("S3_ENDPOINT", "MINIO_ENDPOINT", default="localhost:9000")
     if not endpoint.startswith("http"):
-        endpoint = f"http://{endpoint}"
-        
+        is_local = endpoint.startswith(("localhost", "127.0.0.1"))
+        scheme = "http" if is_local else "https"
+        endpoint = f"{scheme}://{endpoint}"
+
+    # Path-style addressing works across MinIO and R2; some providers need
+    # virtual-hosted style, so it's overridable.
+    addressing_style = _setting("S3_ADDRESSING_STYLE", default="path")
+
     return boto3.client(
         "s3",
         endpoint_url=endpoint,
-        aws_access_key_id=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
-        aws_secret_access_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
-        config=Config(signature_version="s3v4"),
-        region_name="us-east-1" # MinIO usually requires a region string
+        aws_access_key_id=_setting("S3_ACCESS_KEY", "MINIO_ACCESS_KEY", default="minioadmin"),
+        aws_secret_access_key=_setting("S3_SECRET_KEY", "MINIO_SECRET_KEY", default="minioadmin"),
+        config=Config(
+            signature_version="s3v4",
+            s3={"addressing_style": addressing_style},
+        ),
+        # R2 uses "auto"; MinIO/S3 accept any region string.
+        region_name=_setting("S3_REGION", "MINIO_REGION", default="us-east-1"),
     )
 
 def ensure_bucket_exists():
