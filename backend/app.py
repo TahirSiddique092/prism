@@ -29,6 +29,36 @@ except ImportError:
     from modules.analytics import analytics_bp
 
 
+try:
+    from backend.modules.auth.service import DEFAULT_DEV_SECRET
+except ImportError:
+    from modules.auth.service import DEFAULT_DEV_SECRET
+
+
+def _validate_security_config(app):
+    """Fail fast at startup if the production security config is unsafe.
+
+    In production (PRISM_ENV/FLASK_ENV == "production") a strong JWT_SECRET is
+    mandatory — booting with a missing/weak/known-default secret would let anyone
+    forge auth tokens. In dev we only warn so local runs and tests stay frictionless.
+    """
+    env = (os.getenv("PRISM_ENV") or os.getenv("FLASK_ENV") or "").strip().lower()
+    is_production = env == "production"
+    secret = os.getenv("JWT_SECRET")
+
+    if is_production:
+        if not secret or secret == DEFAULT_DEV_SECRET or len(secret) < 32:
+            raise RuntimeError(
+                "JWT_SECRET must be set to a strong value (>=32 chars, not the "
+                "development default) when PRISM_ENV=production."
+            )
+    elif not secret:
+        app.logger.warning(
+            "JWT_SECRET is not set; using the insecure development fallback. "
+            "Set JWT_SECRET and PRISM_ENV=production before deploying."
+        )
+
+
 def create_app(test_config=None):
     """Application factory for PRISM backend."""
     app = Flask(__name__)
@@ -46,6 +76,7 @@ def create_app(test_config=None):
     app.register_blueprint(analytics_bp)
     
     if not test_config:
+        _validate_security_config(app)
         try:
             ensure_bucket_exists()
         except Exception as e:
