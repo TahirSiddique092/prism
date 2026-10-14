@@ -215,8 +215,10 @@ you just mint the **long-lived S3 credentials** the backend uses.
      "https://console.neon.tech/api/v2/projects/{project_id}/branches/{branch_id}/credentials" \
      -H "Authorization: Bearer $NEON_API_KEY" \
      -H "Content-Type: application/json" \
-     -d '{"scopes": ["storage:read", "storage:write"]}'
+     -d '{"scopes": ["storage:read", "storage:write"], "principal_type": "user"}'
    ```
+   (`principal_type` is required — without it the API returns
+   `principal_type (field required)`.)
    From the JSON response copy:
    - `token_id`             → **`S3_ACCESS_KEY`**
    - `s3_secret_access_key` → **`S3_SECRET_KEY`** (shown **once** — save it now)
