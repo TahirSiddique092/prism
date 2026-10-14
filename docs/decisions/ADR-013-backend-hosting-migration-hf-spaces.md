@@ -17,7 +17,9 @@ Split the single VM into a compute host + managed data services (Path B):
 - **Compute:** Hugging Face Spaces (Docker SDK), free CPU tier (2 vCPU / 16 GB
   RAM, HTTPS). Fits the model; sleeps after 48h idle.
 - **Data (managed free tiers):** Neon (pgvector), Aiven (MySQL + FULLTEXT),
-  Neo4j AuraDB Free, Upstash (Redis), Cloudflare R2 (object storage).
+  Neo4j AuraDB Free, Upstash (Redis), and Neon Object Storage (S3-compatible,
+  built into the same Neon project — no separate account or credit card; a
+  Cloudflare R2 bucket is an equivalent drop-in alternative).
 
 Run the API under **gunicorn** (not the Flask dev server), fail-fast on bad
 config / failed migrations, and serve everything over HTTPS.

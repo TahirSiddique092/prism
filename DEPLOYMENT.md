@@ -6,7 +6,13 @@ fresh with **one new Google account** dedicated to this project.
 
 - **Backend** (Flask API + embedding model) → **Hugging Face Spaces** (Docker)
 - **Frontend** (Next.js) → **Vercel**
-- **Data** → Neon (pgvector), Aiven (MySQL), Neo4j AuraDB, Upstash (Redis), Cloudflare R2 (files)
+- **Data** → **Neon** (pgvector **and** S3-compatible Object Storage for files), Aiven (MySQL), Neo4j AuraDB, Upstash (Redis)
+
+> **No credit card anywhere, and one fewer account.** Files are stored in
+> **Neon Object Storage** — an S3-compatible store built into the same Neon
+> project that already holds the vectors (5 GB free, no card). Our backend speaks
+> generic S3, so this is a config-only choice; Cloudflare R2 remains a drop-in
+> alternative (but R2 asks for a card to activate).
 
 > Companion docs: `deploy/huggingface-setup.md` (condensed), `ADR-013`
 > (why this architecture), `deploy/README.md` (legacy OCI / local dev).
@@ -22,8 +28,8 @@ Browser ──HTTPS──> Vercel (Next.js)
                  Hugging Face Space (Flask API + all-MiniLM-L6-v2)  ──HTTPS──┐
                      │          │            │           │                    │
                      ▼          ▼            ▼           ▼                    ▼
-                 Neon        Aiven        AuraDB      Upstash          Cloudflare R2
-               (pgvector)   (MySQL)      (Neo4j)     (Redis)          (PDF storage)
+                 Neon        Aiven        AuraDB      Upstash          Neon Object Storage
+               (pgvector)   (MySQL)      (Neo4j)     (Redis)          (PDF storage, same project)
 ```
 
 Everything is HTTPS end-to-end, which is what makes the inline PDF viewer and
@@ -39,7 +45,9 @@ secure credential flow work.
 | Neo4j Aura | ✅ Yes | Google / email |
 | Upstash | ✅ Yes | Google / GitHub |
 | Vercel | ⚠️ Via email | Vercel logs in with GitHub/GitLab/Bitbucket/**Email**. We use the **Vercel CLI + email** path below so you do NOT need to tie it to a GitHub account. |
-| Cloudflare (R2) | ❌ No Google SSO | Create a Cloudflare account with your **Google email + a password**. Requires adding a card to *activate R2*, but the free tier does not charge. |
+
+> Object storage no longer needs its own provider — it lives inside your **Neon**
+> project (same Google sign-in, no card). Cloudflare is dropped entirely.
 
 > Use the **same Google email** everywhere so all dashboards live under one
 > identity. Turn on 2FA where offered.
@@ -63,11 +71,11 @@ NEO4J_USER=neo4j
 NEO4J_PASSWORD=________________________________________
 REDIS_URL=rediss://____:____@____:____                        # Upstash (step 1d)
 
-S3_ENDPOINT=https://____.r2.cloudflarestorage.com             # R2 (step 1e)
-S3_ACCESS_KEY=________________________________________
-S3_SECRET_KEY=________________________________________
+S3_ENDPOINT=https://br-____.storage.c-2.____.aws.neon.tech    # Neon Object Storage (step 1e)
+S3_ACCESS_KEY=________________________________________        # Neon credential token_id
+S3_SECRET_KEY=________________________________________        # Neon credential s3_secret_access_key
 S3_BUCKET=prism-documents
-S3_REGION=auto
+S3_REGION=____                                                # your Neon branch region, e.g. us-east-2
 
 # --- Frontend (Vercel → Environment Variables) ---
 API_URL=https://____-____.hf.space                            # step 3 (HF Space URL)
@@ -101,11 +109,17 @@ openssl version        # for the JWT secret
 
 Do these in any order, but collect every value into your vault (§0.2).
 
-### 1a. Neon — PostgreSQL + pgvector (stores embeddings)
+### 1a. Neon — PostgreSQL + pgvector (embeddings) + Object Storage (files)
+
+This one project provides **both** the vector store (step 1a) and the file
+object storage (step 1e) — no separate storage account, no card.
 
 1. Go to **neon.com** → **Sign up** → **Continue with Google**.
-2. **Create project** (name: `prism`). Pick the region closest to where you'll
-   put the HF Space (e.g. US East). Postgres version 15+.
+2. **Create project** (name: `prism`). Pick a region that also supports Object
+   Storage: `us-east-2`, `us-east-1`, `eu-central-1`, or `ap-southeast-1`
+   (choose the one nearest your HF Space). Postgres 15+. Note the project's
+   **default branch name** (looks like `br-winter-pond-xxxx`) and **region** —
+   you'll need both in step 1e.
 3. On the project dashboard, open **Connection string** (a.k.a. "Connection
    Details"). Copy the **`postgresql://…?sslmode=require`** string.
 4. Save it as **`POSTGRES_URL`**. It already contains the db name (often
@@ -115,6 +129,9 @@ Do these in any order, but collect every value into your vault (§0.2).
    CREATE EXTENSION IF NOT EXISTS vector;
    ```
    (The migration also runs this, but doing it now confirms your access.)
+6. Create a **Neon API key** (needed to mint storage credentials in step 1e):
+   **Profile → Account settings → API keys → Create API key** → save it as
+   `NEON_API_KEY` in your vault (local only).
 
 ### 1b. Aiven — MySQL (users, documents, chunks, FULLTEXT, analytics)
 
@@ -155,21 +172,48 @@ Do these in any order, but collect every value into your vault (§0.2).
    the **`rediss://…`** (TLS) URL → **`REDIS_URL`**.
    - Must be `rediss://` (double-s = TLS), not `redis://`.
 
-### 1e. Cloudflare R2 — object storage (uploaded PDFs)
+### 1e. Neon Object Storage — uploaded PDFs (same Neon project as 1a)
 
-> Cloudflare has **no Google SSO**. Create the account with your Google email +
-> a password.
+Neon has a built-in **S3-compatible** object store (5 GB free, **no card**, no
+extra account). You create a bucket, then mint long-lived S3 credentials.
 
-1. Go to **dash.cloudflare.com** → **Sign up** (Google email + password) → verify email.
-2. In the dashboard sidebar open **R2**. Enable it (you may need to add a card to
-   activate R2; the free tier — 10 GB storage, generous ops — does not charge).
-3. **Create bucket** → name it exactly **`prism-documents`** → create.
-4. **R2 → Manage R2 API Tokens → Create API token**:
-   - Permissions: **Object Read & Write**.
-   - Create → copy the **Access Key ID**, **Secret Access Key**, and the
-     **S3 API endpoint** `https://<accountid>.r2.cloudflarestorage.com`.
-5. Save: **`S3_ENDPOINT`**, **`S3_ACCESS_KEY`**, **`S3_SECRET_KEY`**,
-   **`S3_BUCKET=prism-documents`**, **`S3_REGION=auto`**.
+> Needs the **Neon CLI** and your `NEON_API_KEY` (from step 1a.6).
+
+1. Install and authenticate the Neon CLI:
+   ```bash
+   npm i -g neonctl
+   neonctl auth          # opens a browser; sign in with the same Google account
+   ```
+2. Create the bucket in your `prism` project:
+   ```bash
+   neonctl buckets create prism-documents
+   # If your CLI version uses a different noun, see `neonctl buckets --help`.
+   ```
+   (The backend's startup bucket-check is best-effort; pre-creating here is what
+   matters. A harmless "Could not initialize bucket" warning in the Space logs is
+   fine as long as this bucket exists.)
+3. Mint **long-lived** S3 credentials for the default branch (replace
+   `{project_id}` and `{branch_id}` — find them with
+   `neonctl projects list` and `neonctl branches list`):
+   ```bash
+   curl -X POST \
+     "https://console.neon.tech/api/v2/projects/{project_id}/branches/{branch_id}/credentials" \
+     -H "Authorization: Bearer $NEON_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"scopes": ["storage:read", "storage:write"]}'
+   ```
+   From the JSON response copy:
+   - `token_id`             → **`S3_ACCESS_KEY`**
+   - `s3_secret_access_key` → **`S3_SECRET_KEY`** (shown **once** — save it now)
+
+   > These credentials don't expire (`expires_at` is `null` / unenforced), so
+   > they're safe as static server keys. If one leaks, rotate with
+   > `neonctl credentials rotate <token_id>` (keeps the same access key id).
+4. Assemble the remaining values from your Neon branch (step 1a.2):
+   - **`S3_ENDPOINT`** = `https://<branch>.storage.c-2.<region>.aws.neon.tech`
+     (e.g. `https://br-winter-pond-aptw82ef.storage.c-2.us-east-2.aws.neon.tech`)
+   - **`S3_REGION`** = your branch region (e.g. `us-east-2`)
+   - **`S3_BUCKET`** = `prism-documents`
 
 ---
 
@@ -342,7 +386,7 @@ On your live Vercel URL:
    httpOnly cookie. Log out and back in.
 2. **Upload** a PDF with a few topic tags → row appears as `processing`, then
    `ready` within a few seconds.
-3. Open the document → the **inline PDF viewer loads** (HTTPS pre-signed R2 URL),
+3. Open the document → the **inline PDF viewer loads** (HTTPS pre-signed Neon Object Storage URL),
    topic tags and related documents show.
 4. **Search** a plain-English query → ranked snippets. Run the **same** query
    again → a **`cached`** badge appears (Redis hit).
@@ -376,7 +420,8 @@ If all five pass, you're live. 🎉
 | Logs show migration/DB connection errors, container exits | wrong DB URL or DB not running | Re-check `MYSQL_URL`/`POSTGRES_URL`; ensure Aiven/Neon are **Running**; this fail-fast is intentional. |
 | `curl /health` works but search 500s | pgvector/MySQL reachable but empty | Confirm migrations ran (logs) and that you uploaded a doc that reached `ready`. |
 | MySQL connection refused / SSL error | Aiven requires TLS | The connector uses TLS by default; re-verify host/port/user/password/db parsed from the Aiven URI (URL-encode special chars). |
-| PDF viewer blank | object URL not https / bucket mismatch | Ensure `S3_ENDPOINT` is the `https://…r2.cloudflarestorage.com` endpoint and `S3_BUCKET=prism-documents`. |
+| PDF viewer blank | object URL not https / bucket mismatch | Ensure `S3_ENDPOINT` is the `https://br-…storage…aws.neon.tech` endpoint, `S3_REGION` matches the branch region, and `S3_BUCKET=prism-documents` exists. |
+| Startup log: "Could not initialize MinIO bucket" | Neon Object Storage doesn't support S3 CreateBucket/HeadBucket | Harmless — the bucket was pre-created via `neonctl buckets create`; uploads/reads/pre-signing still work. |
 | Frontend calls fail / CORS 403 | `FRONTEND_URL` missing or wrong on Space | Set `FRONTEND_URL` to the exact Vercel origin; with `CORS_STRICT=true` only that origin is allowed. |
 | First request after idle is very slow | free Space slept (48h idle) | Expected cold start (~30–60s to reload the model). Data is safe (external DBs). |
 | Related docs/topics always empty | AuraDB paused (3-day idle) or creds wrong | Resume the AuraDB instance; re-check `NEO4J_URI/USER/PASSWORD`. |
@@ -393,7 +438,7 @@ If all five pass, you're live. 🎉
 | Aiven MySQL | 1 GB, single node | Storage cap |
 | Neo4j AuraDB Free | 200k nodes / 400k rels; **pauses after 3 days idle**, **deleted after 30 days idle** | Visit periodically; keep creds to recreate |
 | Upstash Redis | 256 MB, 500k commands/month | Command budget under heavy search |
-| Cloudflare R2 | 10 GB storage, generous ops | — |
+| Neon Object Storage | 5 GB storage (shared Neon project) | Counts toward your Neon project; large PDFs add up alongside vectors |
 
 **Routine upkeep:** hit the app at least every couple of days to keep AuraDB
 awake; rotate `JWT_SECRET` if you suspect exposure (invalidates all sessions);
@@ -414,10 +459,10 @@ keep your credentials vault backed up.
 | `NEO4J_URI` | HF Space | `neo4j+s://<id>.databases.neo4j.io` |
 | `NEO4J_USER` / `NEO4J_PASSWORD` | HF Space | AuraDB credentials |
 | `REDIS_URL` | HF Space | `rediss://…` (Upstash) |
-| `S3_ENDPOINT` | HF Space | `https://<acct>.r2.cloudflarestorage.com` |
-| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | HF Space | R2 API token |
+| `S3_ENDPOINT` | HF Space | `https://br-<id>.storage.c-2.<region>.aws.neon.tech` |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | HF Space | Neon credential `token_id` / `s3_secret_access_key` |
 | `S3_BUCKET` | HF Space | `prism-documents` |
-| `S3_REGION` | HF Space | `auto` |
+| `S3_REGION` | HF Space | Neon branch region, e.g. `us-east-2` |
 | `API_URL` | Vercel | HF Space URL (server-only, preferred) |
 | `NEXT_PUBLIC_API_URL` | Vercel | HF Space URL (compatibility) |
 
