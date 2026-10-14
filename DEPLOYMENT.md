@@ -115,21 +115,35 @@ This one project provides **both** the vector store (step 1a) and the file
 object storage (step 1e) — no separate storage account, no card.
 
 1. Go to **neon.com** → **Sign up** → **Continue with Google**.
-2. **Create project** (name: `prism`). Pick a region that also supports Object
-   Storage: `us-east-2`, `us-east-1`, `eu-central-1`, or `ap-southeast-1`
-   (choose the one nearest your HF Space). Postgres 15+. Note the project's
-   **default branch name** (looks like `br-winter-pond-xxxx`) and **region** —
-   you'll need both in step 1e.
-3. On the project dashboard, open **Connection string** (a.k.a. "Connection
+2. On **"Create your first project"**:
+   - **Project name:** `prism`
+   - **Region:** pick a region that also supports Object Storage — `us-east-1`,
+     `us-east-2`, `eu-central-1`, or `ap-southeast-1`. **Recommended: `us-east-1`.**
+     Your backend runs on Hugging Face Spaces (US-hosted) and hits the DB on
+     every search, so a US region keeps latency low. Put **all** your datastores
+     (Aiven, AuraDB, Upstash) in this **same** region. A far region (e.g.
+     Singapore) still works but adds noticeable per-request latency.
+   - **Services:** leave **Postgres database** ON. Turn **Object storage** ON and,
+     in the bucket row, set **Bucket name = `prism-documents`** and
+     **Visibility = Private** (the app serves PDFs via temporary *presigned* URLs,
+     so the bucket must stay private). Leave **Functions / AI gateway / Neon Auth**
+     OFF — PRISM doesn't use them.
+   - Click **Create project**.
+
+   > Creating the bucket here means you can **skip the CLI bucket-creation** in
+   > step 1e. Keep Visibility **Private**.
+3. Note the project's **default branch name** (looks like `br-winter-pond-xxxx`)
+   and **region** — you'll need both to build `S3_ENDPOINT` in step 1e.
+4. On the project dashboard, open **Connection string** (a.k.a. "Connection
    Details"). Copy the **`postgresql://…?sslmode=require`** string.
-4. Save it as **`POSTGRES_URL`**. It already contains the db name (often
+5. Save it as **`POSTGRES_URL`**. It already contains the db name (often
    `neondb`) and `sslmode=require` — keep that query string.
-5. Enable pgvector: open the **SQL Editor** and run:
+6. Enable pgvector: open the **SQL Editor** and run:
    ```sql
    CREATE EXTENSION IF NOT EXISTS vector;
    ```
    (The migration also runs this, but doing it now confirms your access.)
-6. Create a **Neon API key** (needed to mint storage credentials in step 1e):
+7. Create a **Neon API key** (needed to mint storage credentials in step 1e):
    **Profile → Account settings → API keys → Create API key** → save it as
    `NEON_API_KEY` in your vault (local only).
 
@@ -175,26 +189,27 @@ object storage (step 1e) — no separate storage account, no card.
 ### 1e. Neon Object Storage — uploaded PDFs (same Neon project as 1a)
 
 Neon has a built-in **S3-compatible** object store (5 GB free, **no card**, no
-extra account). You create a bucket, then mint long-lived S3 credentials.
+extra account). The **bucket** is created in the project wizard (step 1a); here
+you just mint the **long-lived S3 credentials** the backend uses.
 
-> Needs the **Neon CLI** and your `NEON_API_KEY` (from step 1a.6).
+> Needs your `NEON_API_KEY` (from step 1a.7). The Neon CLI (`neonctl`) is
+> optional — only used to look up IDs below.
 
-1. Install and authenticate the Neon CLI:
+1. **Bucket:** if you turned **Object storage** ON and named the bucket
+   `prism-documents` (Private) in the project wizard (step 1a), it already
+   exists — **skip to step 2**.
+   Otherwise create it now, either in the console (**Project → Object storage →
+   Create bucket → `prism-documents`, Private**) or via the CLI:
    ```bash
-   npm i -g neonctl
-   neonctl auth          # opens a browser; sign in with the same Google account
+   npm i -g neonctl && neonctl auth
+   neonctl buckets create prism-documents     # see `neonctl buckets --help` if the noun differs
    ```
-2. Create the bucket in your `prism` project:
-   ```bash
-   neonctl buckets create prism-documents
-   # If your CLI version uses a different noun, see `neonctl buckets --help`.
-   ```
-   (The backend's startup bucket-check is best-effort; pre-creating here is what
-   matters. A harmless "Could not initialize bucket" warning in the Space logs is
-   fine as long as this bucket exists.)
-3. Mint **long-lived** S3 credentials for the default branch (replace
-   `{project_id}` and `{branch_id}` — find them with
-   `neonctl projects list` and `neonctl branches list`):
+   > The backend's startup bucket-check is best-effort; what matters is that this
+   > bucket exists. A harmless "Could not initialize bucket" warning in the Space
+   > logs is fine.
+2. Mint **long-lived** S3 credentials for the default branch (replace
+   `{project_id}` and `{branch_id}` — find them in the console URL or with
+   `neonctl projects list` / `neonctl branches list`):
    ```bash
    curl -X POST \
      "https://console.neon.tech/api/v2/projects/{project_id}/branches/{branch_id}/credentials" \
@@ -209,7 +224,7 @@ extra account). You create a bucket, then mint long-lived S3 credentials.
    > These credentials don't expire (`expires_at` is `null` / unenforced), so
    > they're safe as static server keys. If one leaks, rotate with
    > `neonctl credentials rotate <token_id>` (keeps the same access key id).
-4. Assemble the remaining values from your Neon branch (step 1a.2):
+3. Assemble the remaining values from your Neon branch (step 1a.3):
    - **`S3_ENDPOINT`** = `https://<branch>.storage.c-2.<region>.aws.neon.tech`
      (e.g. `https://br-winter-pond-aptw82ef.storage.c-2.us-east-2.aws.neon.tech`)
    - **`S3_REGION`** = your branch region (e.g. `us-east-2`)
