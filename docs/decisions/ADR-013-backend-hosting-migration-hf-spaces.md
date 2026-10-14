@@ -1,7 +1,9 @@
 # ADR-013: Backend hosting migration — OCI VM → Hugging Face Spaces + managed free tiers
 
 ## Status
-Accepted (supersedes ADR-011 OCI deployment as the production target).
+**Superseded by ADR-014** (the project is no longer deployed to the cloud; it
+runs locally via docker-compose). Retained for historical context — the
+`deploy/huggingface/*` artifacts this ADR references have been removed.
 
 ## Context
 The backend was deployed as an all-in-one `docker-compose` stack (Flask + MySQL

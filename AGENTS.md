@@ -11,7 +11,7 @@ PRISM (Personal Relational Intelligent Search Machine) is a web app where users 
 ```
 /
 ├── frontend/          # Next.js app — deployed on Vercel
-├── backend/           # Flask REST API — deployed on Hugging Face Spaces (see deploy/huggingface-setup.md; OCI/docker-compose is local dev only)
+├── backend/           # Flask REST API — runs locally via docker-compose (the whole stack; see README.md / ADR-014)
 │   ├── modules/
 │   │   ├── auth/
 │   │   ├── documents/

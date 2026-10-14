@@ -1,10 +1,10 @@
 # PRISM OCI VM Deployment Guide (Slice 22)
 
-> **⚠️ Superseded for production.** The production backend now deploys to
-> **Hugging Face Spaces + managed free tiers** — see
-> [`huggingface-setup.md`](./huggingface-setup.md) and ADR-013. This OCI /
-> `docker-compose` guide is retained for **local development** and historical
-> reference.
+> **⚠️ Historical.** PRISM is not deployed to the cloud — it runs **locally via
+> `docker compose up`** (see the root [`README.md`](../README.md) and
+> [`ADR-014`](../docs/decisions/ADR-014-local-only-docker-compose.md)). This
+> OCI guide is kept only for historical reference; the `docker-compose.yml`
+> steps below still describe the local stack.
 
 This guide documents deploying the PRISM backend (Flask REST API, MySQL 8, pgvector/PostgreSQL 15, Neo4j 5, Redis 7, and MinIO) to an Oracle Cloud Infrastructure (OCI) Compute Virtual Machine using Docker Compose.
 

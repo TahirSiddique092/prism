@@ -95,9 +95,19 @@ def test_env_files_not_committed_and_ignored():
 
     assert ".env" in gitignore_content, ".env must be ignored in .gitignore"
 
-    # Ensure no actual .env is committed or tracked by git
-    env_file = REPO_ROOT / ".env"
-    assert not env_file.exists(), ".env must never be committed to repository"
+    # A local .env on a developer machine is expected and fine; what the AC
+    # actually requires is that .env is never COMMITTED/tracked by git. Check
+    # git tracking rather than mere filesystem existence (which would fail for
+    # anyone who has created a local .env).
+    import subprocess
+
+    tracked = subprocess.run(
+        ["git", "ls-files", ".env"],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert tracked == "", ".env must never be committed/tracked by git"
 
 
 def test_flask_health_endpoint():
