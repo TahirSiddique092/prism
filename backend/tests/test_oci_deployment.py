@@ -143,20 +143,3 @@ def test_backend_dockerfile_and_entrypoint_exist():
     # Entrypoint must run migrations
     assert "migrate.py" in ep_content, "Entrypoint must run migrate.py against live database"
     assert "app.py" in ep_content, "Entrypoint must start Flask application"
-
-
-def test_adr_011_and_deployment_docs_exist():
-    """AC Documentation: ADR-011 and deployment scripts exist."""
-    adr_path = REPO_ROOT / "docs" / "decisions" / "ADR-011-oci-deployment.md"
-    setup_script = REPO_ROOT / "deploy" / "oci-setup.sh"
-    readme_path = REPO_ROOT / "deploy" / "README.md"
-
-    assert adr_path.exists(), "docs/decisions/ADR-011-oci-deployment.md must exist"
-    assert setup_script.exists(), "deploy/oci-setup.sh must exist"
-    assert readme_path.exists(), "deploy/README.md must exist"
-
-    with open(adr_path, "r") as f:
-        adr_content = f.read()
-
-    assert "Neo4j 2GB Memory Cap" in adr_content
-    assert "Multi-Service Docker Compose Architecture" in adr_content

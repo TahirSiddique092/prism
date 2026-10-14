@@ -10,7 +10,7 @@ PRISM (Personal Relational Intelligent Search Machine) is a web app where users 
 
 ```
 /
-├── frontend/          # Next.js app — deployed on Vercel
+├── frontend/          # Next.js app — runs locally via docker-compose
 ├── backend/           # Flask REST API — runs locally via docker-compose (the whole stack; see README.md / ADR-014)
 │   ├── modules/
 │   │   ├── auth/

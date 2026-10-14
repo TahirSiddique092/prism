@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
-// Served from GitHub Pages at https://<user>.github.io/prism/, so the app is
-// statically exported under the "/prism" base path. Override via BASE_PATH
-// (e.g. "" for a custom domain or local preview at the root).
-const basePath = process.env.BASE_PATH ?? "/prism";
+// Statically exported. Served at the domain root (e.g. on Vercel), so no base
+// path by default. Set BASE_PATH (e.g. "/prism") only if hosting under a
+// sub-path such as a GitHub Pages project site.
+const basePath = process.env.BASE_PATH ?? "";
 
 const nextConfig: NextConfig = {
   output: "export",
