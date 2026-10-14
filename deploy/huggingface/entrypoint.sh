@@ -10,9 +10,9 @@ echo "=== PRISM Backend (Hugging Face Spaces) ==="
 
 PORT="${PORT:-7860}"
 
-# All datastores are managed external services (Neon, Aiven, AuraDB, Upstash,
-# R2); their URLs come straight from Space secrets. Apply migrations against the
-# live MySQL + Postgres instances before accepting traffic.
+# All datastores are managed external services (Neon Postgres + Object Storage,
+# Aiven MySQL, Neo4j AuraDB, Upstash Redis); their URLs come straight from Space
+# secrets. Apply migrations against the live MySQL + Postgres before serving.
 echo "Applying database migrations..."
 python /app/backend/db/migrate.py
 

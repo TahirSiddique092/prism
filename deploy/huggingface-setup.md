@@ -20,7 +20,7 @@ and data survives Space restarts/sleeps.
 | MySQL (users/docs/FULLTEXT) | MySQL container | **Aiven for MySQL** | always-free; 1 GB; InnoDB FULLTEXT supported |
 | Neo4j (topic graph) | Neo4j container | **Neo4j AuraDB Free** | 200k nodes; pauses after 3 days idle |
 | Redis (cache) | Redis container | **Upstash Redis** | 256 MB / 500k cmds per month |
-| Object store (PDFs) | MinIO container | **Cloudflare R2** (or Supabase Storage) | S3-compatible, HTTPS pre-signed URLs |
+| Object store (PDFs) | MinIO container | **Neon Object Storage** (same Neon project) | S3-compatible, HTTPS pre-signed URLs, no card |
 
 > HTTPS everywhere also closes two audit findings for free: credentials/JWTs are
 > no longer sent in cleartext (backend is HTTPS), and the inline PDF viewer works
@@ -38,11 +38,13 @@ Create a free account on each and capture the connection string:
 3. **Neo4j AuraDB Free** → create instance → download credentials →
    `NEO4J_URI=neo4j+s://<id>.databases.neo4j.io`, `NEO4J_USER`, `NEO4J_PASSWORD`.
 4. **Upstash Redis** → create database → copy the TLS (`rediss://`) URL → `REDIS_URL`.
-5. **Cloudflare R2** → create a bucket named `prism-documents` → create an API
-   token (Object Read & Write) → note the account endpoint
-   `https://<account>.r2.cloudflarestorage.com`, access key, secret key →
-   `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET=prism-documents`,
-   `S3_REGION=auto`.
+5. **Neon Object Storage** (same Neon project as step 1, no extra account/card) →
+   `neonctl buckets create prism-documents`, then mint long-lived S3 credentials
+   via the Neon credentials API (`scopes: storage:read, storage:write`) →
+   `S3_ENDPOINT=https://br-<id>.storage.c-2.<region>.aws.neon.tech`,
+   `S3_ACCESS_KEY=<token_id>`, `S3_SECRET_KEY=<s3_secret_access_key>`,
+   `S3_BUCKET=prism-documents`, `S3_REGION=<branch-region>`. See `DEPLOYMENT.md`
+   §1e for the exact commands.
 
 ## 2. Create the Hugging Face Space
 
@@ -55,7 +57,7 @@ Create a free account on each and capture the connection string:
    to the root, or add the Space as a second remote and sync.
 3. In **Settings → Variables and secrets**, add every secret listed in
    `deploy/huggingface/README.md` (JWT_SECRET, PRISM_ENV=production,
-   CORS_STRICT=true, FRONTEND_URL, the five DB URLs, and the R2 credentials).
+   CORS_STRICT=true, FRONTEND_URL, the DB URLs, and the Neon Object Storage S3 credentials).
 4. The Space builds and starts; once healthy its URL is
    `https://<user>-<space>.hf.space`. Verify:
    ```bash
@@ -80,7 +82,7 @@ Space so the backend's CORS allows only your Vercel origin.
 
 1. Register/login on the Vercel site → JWT cookie set, dashboard loads.
 2. Upload a PDF → appears as `processing` then `ready`; the inline PDF viewer
-   loads (HTTPS pre-signed R2 URL).
+   loads (HTTPS pre-signed Neon Object Storage URL).
 3. Search a plain-English query → ranked snippets; repeat → `cached` badge.
 4. Analytics pages populate (history, top documents, unsearched).
 

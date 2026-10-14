@@ -47,11 +47,11 @@ NEO4J_USER=neo4j
 NEO4J_PASSWORD=<auradb-password>
 REDIS_URL=rediss://<upstash-host>:<port>?password=<token>
 
-S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com
-S3_ACCESS_KEY=<r2-access-key>
-S3_SECRET_KEY=<r2-secret-key>
+S3_ENDPOINT=https://br-<id>.storage.c-2.<region>.aws.neon.tech
+S3_ACCESS_KEY=<neon-credential-token_id>
+S3_SECRET_KEY=<neon-credential-s3_secret_access_key>
 S3_BUCKET=prism-documents
-S3_REGION=auto
+S3_REGION=<neon-branch-region>   # e.g. us-east-2
 ```
 
 > Sleep note: the free CPU Space sleeps after 48h idle and the first request
