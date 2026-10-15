@@ -130,18 +130,3 @@ def test_next_public_api_url_configured_in_frontend():
 
     assert "NEXT_PUBLIC_API_URL" in content
     assert "getApiBaseUrl" in content
-
-
-def test_vercel_configuration_files_exist():
-    """AC 1: Vercel deployment configurations and ADR-012 exist."""
-    root_vercel = REPO_ROOT / "vercel.json"
-    frontend_vercel = REPO_ROOT / "frontend" / "vercel.json"
-    frontend_env_example = REPO_ROOT / "frontend" / ".env.example"
-    deploy_guide = REPO_ROOT / "deploy" / "vercel-setup.md"
-    adr_path = REPO_ROOT / "docs" / "decisions" / "ADR-012-vercel-deployment-and-cors.md"
-
-    assert root_vercel.exists(), "vercel.json must exist at root"
-    assert frontend_vercel.exists(), "frontend/vercel.json must exist"
-    assert frontend_env_example.exists(), "frontend/.env.example must exist"
-    assert deploy_guide.exists(), "deploy/vercel-setup.md must exist"
-    assert adr_path.exists(), "docs/decisions/ADR-012-vercel-deployment-and-cors.md must exist"

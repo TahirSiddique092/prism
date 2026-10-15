@@ -33,13 +33,28 @@ export function getApiBaseUrl(): string {
 }
 
 /**
- * httpOnly cookie options. `secure` is only enabled in production so the cookie
- * still works over plain http://localhost during development.
+ * Whether the auth cookie should carry the `Secure` flag.
+ *
+ * Defaults to on in production, off otherwise — but is overridable via
+ * `COOKIE_SECURE` so the local docker-compose stack (served over plain
+ * http://localhost) can set `COOKIE_SECURE=false`, otherwise the browser would
+ * drop the Secure cookie and logins would silently fail.
+ */
+function cookieSecure(): boolean {
+  const override = process.env.COOKIE_SECURE?.toLowerCase();
+  if (override === "true") return true;
+  if (override === "false") return false;
+  return process.env.NODE_ENV === "production";
+}
+
+/**
+ * httpOnly cookie options. `secure` is enabled in production (and over real
+ * HTTPS) so the JWT is never sent over plaintext; disabled for local http.
  */
 export function authCookieOptions() {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: cookieSecure(),
     sameSite: "lax" as const,
     path: "/",
     maxAge: AUTH_COOKIE_MAX_AGE,

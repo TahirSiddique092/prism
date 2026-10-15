@@ -78,8 +78,11 @@ services:
       - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio:9000}
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      # Browser-reachable endpoint used ONLY when signing view URLs, so the PDF
+      # viewer loads in the browser (which can't resolve the internal "minio" host).
+      - MINIO_PUBLIC_ENDPOINT=${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
       - JWT_SECRET=${JWT_SECRET:-your-secret-key}
-      - FRONTEND_URL=${FRONTEND_URL:-https://prism.vercel.app}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - PORT=5000
     depends_on:
       - mysql
@@ -87,6 +90,23 @@ services:
       - neo4j
       - redis
       - minio
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Server-side base URL for Next route handlers to reach the backend
+      # container over the compose network.
+      - API_URL=${API_URL:-http://backend:5000}
+      # Local stack is http://localhost, so the auth cookie must NOT be Secure.
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      - NODE_ENV=production
+    depends_on:
+      - backend
 
 volumes:
   mysql_data:

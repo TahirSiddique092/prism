@@ -19,15 +19,25 @@ def _setting(*names: str, default: str | None = None) -> str | None:
 BUCKET_NAME = _setting("S3_BUCKET", "MINIO_BUCKET", default="prism-documents")
 
 
-def get_s3_client():
+def get_s3_client(for_presign: bool = False):
     """Build an S3 client for any S3-compatible store (MinIO, Cloudflare R2,
     Supabase Storage, AWS S3).
 
     The endpoint scheme defaults to https for remote hosts (so pre-signed URLs
     are https and load in the browser without mixed-content errors) and http
     only for localhost dev.
+
+    When ``for_presign`` is True and a public endpoint is configured
+    (``MINIO_PUBLIC_ENDPOINT`` / ``S3_PUBLIC_ENDPOINT``), that host is used to
+    sign the URL instead. This is what makes the inline PDF viewer work in the
+    local docker-compose stack: the backend uploads via the internal ``minio``
+    host, but the browser can only reach storage at ``localhost:9000``.
     """
-    endpoint = _setting("S3_ENDPOINT", "MINIO_ENDPOINT", default="localhost:9000")
+    endpoint = None
+    if for_presign:
+        endpoint = _setting("S3_PUBLIC_ENDPOINT", "MINIO_PUBLIC_ENDPOINT")
+    if not endpoint:
+        endpoint = _setting("S3_ENDPOINT", "MINIO_ENDPOINT", default="localhost:9000")
     if not endpoint.startswith("http"):
         is_local = endpoint.startswith(("localhost", "127.0.0.1"))
         scheme = "http" if is_local else "https"
@@ -85,8 +95,12 @@ def delete_file(object_name: str) -> bool:
         raise
 
 def generate_presigned_url(object_name: str, expires_in: int = 3600) -> str:
-    """Generate a temporary pre-signed URL to view the object in MinIO."""
-    s3 = get_s3_client()
+    """Generate a temporary pre-signed URL to view the object in MinIO.
+
+    Uses the public/browser-reachable endpoint when configured (see
+    get_s3_client) so the signed URL opens directly in the user's browser.
+    """
+    s3 = get_s3_client(for_presign=True)
     return s3.generate_presigned_url(
         ClientMethod="get_object",
         Params={"Bucket": BUCKET_NAME, "Key": object_name},
