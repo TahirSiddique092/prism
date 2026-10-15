@@ -10,20 +10,29 @@ export default function Nav() {
           <Logo size={26} />
         </a>
         <div className="flex items-center gap-7">
-          <a href="#features" className="hidden text-sm text-muted transition-colors hover:text-ink sm:inline">
+          <a
+            href="#features"
+            className="hidden text-sm text-muted transition-colors hover:text-ink hover:underline hover:underline-offset-4 decoration-1 sm:inline"
+          >
             Features
           </a>
-          <a href="#architecture" className="hidden text-sm text-muted transition-colors hover:text-ink sm:inline">
+          <a
+            href="#architecture"
+            className="hidden text-sm text-muted transition-colors hover:text-ink hover:underline hover:underline-offset-4 decoration-1 sm:inline"
+          >
             Architecture
           </a>
-          <a href="#run" className="hidden text-sm text-muted transition-colors hover:text-ink sm:inline">
+          <a
+            href="#run"
+            className="hidden text-sm text-muted transition-colors hover:text-ink hover:underline hover:underline-offset-4 decoration-1 sm:inline"
+          >
             Run&nbsp;it
           </a>
           <a
             href={REPO}
             target="_blank"
             rel="noopener"
-            className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition-transform hover:-translate-y-0.5"
+            className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition-all hover:-translate-y-0.5 hover:bg-ink-soft shadow-sm"
           >
             GitHub ↗
           </a>

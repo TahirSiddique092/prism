@@ -94,7 +94,7 @@ export default function RunIt() {
               href={REPO}
               target="_blank"
               rel="noopener"
-              className="mt-8 inline-flex items-center gap-2 rounded-full bg-paper px-7 py-3.5 text-[0.95rem] font-medium text-ink transition-transform hover:-translate-y-0.5"
+              className="mt-8 inline-flex items-center gap-2 rounded-full bg-paper px-7 py-3.5 text-[0.95rem] font-medium text-ink transition-all hover:-translate-y-0.5 hover:bg-white shadow-[0_10px_30px_-12px_rgba(0,0,0,0.5)]"
             >
               View the repository ↗
             </a>
