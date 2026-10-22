@@ -12,42 +12,45 @@ Flask API and a Next.js frontend.
 
 ---
 
-## Quick start — one command
+## Quick start
 
-Everything runs locally in Docker. You need **Docker Desktop** (or Docker Engine
-+ Compose v2) and ~**4–6 GB of free RAM**.
+PRISM uses a **hybrid** deployment (see `docs/decisions/ADR-015`): the
+compute-heavy parts — the Flask backend with its in-process embedding model, and
+the Next.js frontend — run locally in Docker, while the five datastores are
+managed free-tier services (Aiven, Neon, Neo4j Aura, Upstash). You need **Docker
+Desktop** (or Docker Engine + Compose v2) and accounts on those providers.
 
 ```bash
 git clone https://github.com/TahirSiddique092/prism.git
 cd prism
-docker compose up          # add --build the first time if needed
+cp .env.example .env       # then fill in the managed-service connection strings
+docker compose up --build  # --build on the first run (also downloads the model)
 ```
 
-First run takes a few minutes (it builds the images and downloads the embedding
-model). When it's up, open:
-
-- **App:** http://localhost:3000
-- MinIO console: http://localhost:9001 (user/pass: `minioadmin` / `minioadmin`)
-
-Then: **register an account → upload a PDF → search it**. Stop everything with
-`Ctrl+C`, and `docker compose down` to remove the containers (add `-v` to also
-wipe the databases and start fresh).
-
-No accounts, no API keys, no cloud — the whole stack is self-contained.
+When it's up, open **http://localhost:3000**, then **register an account →
+upload a PDF → search it**. Stop with `Ctrl+C`; `docker compose down` removes the
+containers (your data lives in the managed services, not local volumes).
 
 ---
 
 ## What's running
 
+**Local (Docker):**
+
 | Service    | Port(s)        | Role |
 |------------|----------------|------|
 | frontend   | 3000           | Next.js (App Router) web UI |
 | backend    | 5000           | Flask REST API + embedding model |
-| mysql      | 3306           | Users, documents, chunks, FULLTEXT, analytics |
-| postgres   | 5432           | pgvector embeddings (semantic search) |
-| neo4j      | 7474 / 7687    | Topic graph (related documents / topics) |
-| redis      | 6379           | Search result cache |
-| minio      | 9000 / 9001    | Uploaded PDF storage (S3-compatible) |
+
+**Managed (configured via `.env`):**
+
+| Datastore              | Provider           | Role |
+|------------------------|--------------------|------|
+| MySQL                  | Aiven              | Users, documents, chunks, FULLTEXT, analytics |
+| PostgreSQL + pgvector  | Neon               | pgvector embeddings (semantic search) |
+| Neo4j                  | Neo4j Aura         | Topic graph (related documents / topics) |
+| Redis                  | Upstash            | Search result cache |
+| Object storage (S3)    | Neon Object Storage| Uploaded PDF storage |
 
 The frontend talks only to the backend (server-side); the backend owns all the
 datastores. Database migrations run automatically on backend startup.
@@ -74,8 +77,8 @@ docker-compose.yml   — the whole stack
 ```
 
 See `docs/` for the full product/architecture docs and `AGENTS.md` for the
-project conventions. Deployment decision: this project runs **locally only** —
-see `docs/decisions/ADR-014-local-only-docker-compose.md`.
+project conventions. Deployment decision: **hybrid — local compute + managed
+data services** — see `docs/decisions/ADR-015-hybrid-local-compute-managed-data.md`.
 
 ## Running the tests
 
