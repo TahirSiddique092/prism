@@ -9,6 +9,7 @@ Public API:
 - normalize_topics(topics) -> list
 - get_related_documents(doc_id, user_id, limit=5) -> list (Slice 13)
 - get_document_topics(doc_id, user_id) -> list (Slice 20)
+- delete_document_from_graph(doc_id, user_id) -> bool (Slice 24)
 """
 try:
     from backend.modules.graph.service import (
@@ -17,6 +18,7 @@ try:
         normalize_topics,
         get_related_documents,
         get_document_topics,
+        delete_document_from_graph,
     )
 except ImportError:
     from modules.graph.service import (
@@ -25,6 +27,7 @@ except ImportError:
         normalize_topics,
         get_related_documents,
         get_document_topics,
+        delete_document_from_graph,
     )
 
 __all__ = [
@@ -33,4 +36,5 @@ __all__ = [
     "normalize_topics",
     "get_related_documents",
     "get_document_topics",
+    "delete_document_from_graph",
 ]

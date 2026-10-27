@@ -144,12 +144,13 @@ def test_sync_is_graceful_when_session_raises():
 # ============================================================================
 
 def _patch_upload_side_effects():
-    """Patch MinIO, MySQL, cache, and the background chunking thread so the
+    """Patch MinIO, MySQL (incl. topic rows), cache, and the background chunking thread so the
     upload test isolates graph behaviour. The graph write runs inline (step 6)
     before chunking (step 7), so stubbing the thread doesn't affect it."""
     return [
         patch("backend.modules.documents.routes.upload_file"),
         patch("backend.modules.documents.routes.insert_document", return_value=42),
+        patch("backend.modules.documents.routes.insert_document_topics"),
         patch("backend.modules.documents.routes.invalidate_user_cache"),
         patch("threading.Thread"),
     ]

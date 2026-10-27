@@ -17,12 +17,16 @@ try:
         get_document_chunk_count,
         delete_document,
         delete_chunk_vectors,
+        insert_document_topics,
+        get_existing_doc_ids,
     )
     from backend.modules.cache import invalidate_user_cache
     from backend.modules.graph import (
         write_document_to_graph_async,
         get_related_documents,
         get_document_topics,
+        delete_document_from_graph,
+        normalize_topics,
     )
 except ImportError:
     from modules.documents.storage import (
@@ -37,12 +41,16 @@ except ImportError:
         get_document_chunk_count,
         delete_document,
         delete_chunk_vectors,
+        insert_document_topics,
+        get_existing_doc_ids,
     )
     from modules.cache import invalidate_user_cache
     from modules.graph import (
         write_document_to_graph_async,
         get_related_documents,
         get_document_topics,
+        delete_document_from_graph,
+        normalize_topics,
     )
 
 logger = logging.getLogger(__name__)
@@ -136,6 +144,12 @@ def get_related_documents_route(doc_id: int):
 
         # get_related_documents degrades gracefully to [] on any Neo4j failure.
         related = get_related_documents(doc_id, user_id)
+
+        # Drop any graph node whose document no longer exists in MySQL (Slice 24).
+        if related:
+            existing = get_existing_doc_ids(user_id, [r["doc_id"] for r in related])
+            related = [r for r in related if r["doc_id"] in existing]
+
         return jsonify(related), 200
     except Exception as e:
         logger.error(f"Error retrieving related docs for doc {doc_id}: {e}")
@@ -185,6 +199,7 @@ def delete_document_route(doc_id: int):
     
     - Deletes document row from MySQL (fires before_document_delete trigger and cascades chunks)
     - Deletes chunk_vectors from pgvector
+    - Deletes the Document node (and orphaned Topics) from Neo4j
     - Deletes file from MinIO after MySQL deletion succeeds
     - Invalidates user's Redis cache
     - Response: { message: "deleted" }
@@ -210,14 +225,20 @@ def delete_document_route(doc_id: int):
         except Exception as e:
             logger.warning(f"Failed to cleanup chunk vectors for doc {doc_id}: {e}")
 
-        # 3. Delete file from MinIO after MySQL deletion succeeds
+        # 3. Remove the Document node from Neo4j (never raises; logs on failure)
+        try:
+            delete_document_from_graph(doc_id, user_id)
+        except Exception as e:
+            logger.warning(f"Failed to delete graph node for doc {doc_id}: {e}")
+
+        # 4. Delete file from MinIO after MySQL deletion succeeds
         if minio_key:
             try:
                 delete_file(minio_key)
             except Exception as e:
                 logger.warning(f"Failed to delete file {minio_key} from MinIO: {e}")
 
-        # 4. Invalidate the user's Redis cache
+        # 5. Invalidate the user's Redis cache
         try:
             invalidate_user_cache(user_id)
         except Exception as e:
@@ -287,11 +308,24 @@ def upload_document():
     except Exception as e:
         return jsonify({"error": f"Failed to upload to storage: {str(e)}"}), 500
         
-    # 5. Insert into MySQL
+    # 5. Insert into MySQL. If that fails, remove the file just stored so no
+    #    object is left without a documents row pointing to it (Slice 24).
     try:
         doc_id = insert_document(user_id=user_id, title=title, minio_key=minio_key)
     except Exception as e:
+        try:
+            delete_file(minio_key)
+        except Exception as cleanup_err:
+            logger.warning(f"Failed to remove {minio_key} after database error: {cleanup_err}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
+
+    # Mirror the topic tags into MySQL topics / doc_topics (Slice 24). Names are
+    # normalised exactly as the graph module does, so both stores agree.
+    topics = _parse_topics_from_form()
+    try:
+        insert_document_topics(doc_id, normalize_topics(topics))
+    except Exception as e:
+        logger.warning(f"Failed to store topics in MySQL for doc {doc_id}: {e}")
 
     # Invalidate search cache for this user
     try:
@@ -301,7 +335,6 @@ def upload_document():
 
     # 6. Write the topic graph to Neo4j (non-blocking; failure never fails upload)
     try:
-        topics = _parse_topics_from_form()
         email = g.user.get("email") if getattr(g, "user", None) else None
         sync_graph = current_app.config.get("GRAPH_WRITE_SYNC", False)
         write_document_to_graph_async(

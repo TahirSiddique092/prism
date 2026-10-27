@@ -103,7 +103,8 @@ def test_related_endpoint_returns_related_docs(client, user1_token):
         {"doc_id": 3, "title": "Indexing.pdf", "shared_topics": 2},
     ]
     with patch("backend.modules.documents.routes.get_document_by_id", return_value={"doc_id": 1, "user_id": 1}), \
-         patch("backend.modules.documents.routes.get_related_documents", return_value=related) as mock_related:
+         patch("backend.modules.documents.routes.get_related_documents", return_value=related) as mock_related, \
+         patch("backend.modules.documents.routes.get_existing_doc_ids", return_value={2, 3}):
 
         res = client.get(
             "/api/documents/1/related",
