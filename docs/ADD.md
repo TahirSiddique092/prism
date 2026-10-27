@@ -2,14 +2,16 @@
 
 ## Stack
 
-- **Frontend:** Next.js — hosted on Vercel
-- **Backend:** Python + Flask (REST API) — hosted on OCI VM
-- **Relational DB:** MySQL 8.0 — on OCI VM
-- **Vector DB:** PostgreSQL + pgvector extension — on OCI VM
-- **Graph DB:** Neo4j (Docker container) — on OCI VM
-- **Cache:** Redis — on OCI VM
-- **File storage:** MinIO (Docker container, S3-compatible) — on OCI VM
-- **Embedding model:** `sentence-transformers/all-MiniLM-L6-v2` — runs in Flask process on OCI VM
+Hosting follows [ADR-015](decisions/ADR-015-hybrid-local-compute-managed-data.md): compute runs locally in Docker, data services are managed free tiers.
+
+- **Frontend:** Next.js — local Docker container
+- **Backend:** Python + Flask (REST API) — local Docker container
+- **Relational DB:** MySQL 8.0 — Aiven
+- **Vector DB:** PostgreSQL + pgvector extension — Neon
+- **Graph DB:** Neo4j — Neo4j Aura
+- **Cache:** Redis — Upstash
+- **File storage:** S3-compatible object storage — Neon Object Storage
+- **Embedding model:** `sentence-transformers/all-MiniLM-L6-v2` — runs in the Flask process
 - **Auth:** JWT (issued by Flask, verified on every protected request)
 
 ---
@@ -18,13 +20,13 @@
 
 ```mermaid
 flowchart LR
-    Client["Next.js (Vercel)"]
-    API["Flask API (OCI VM)"]
+    Client["Next.js (local)"]
+    API["Flask API (local)"]
     MySQL[("MySQL")]
     PG[("pgvector")]
     Neo4j[("Neo4j")]
     Redis[("Redis")]
-    MinIO[("MinIO")]
+    MinIO[("Object storage")]
     Embed["Embedding model"]
 
     Client -->|HTTPS + JWT| API
@@ -56,20 +58,24 @@ flowchart LR
 | POST | `/api/auth/register` | `{ name, email, password }` | `{ user_id, token }` |
 | POST | `/api/auth/login` | `{ email, password }` | `{ user_id, token }` |
 | POST | `/api/auth/logout` | — | `{ message }` |
-| GET | `/api/documents` | — | `[{ doc_id, title, uploaded_at }]` |
-| POST | `/api/documents/upload` | `form-data: file, topics[]` | `{ doc_id, chunk_count }` |
+| GET | `/api/documents` | — | `[{ doc_id, title, uploaded_at, status, chunk_count }]` |
+| GET | `/api/documents/:doc_id` | — | `{ doc_id, title, uploaded_at, status, chunk_count, topics }` |
+| GET | `/api/documents/:doc_id/url` | — | `{ view_url }` |
+| POST | `/api/documents/upload` | `form-data: file, topics[]` | `{ doc_id, minio_key }` |
 | DELETE | `/api/documents/:doc_id` | — | `{ message }` |
 | GET | `/api/documents/:doc_id/related` | — | `[{ doc_id, title, shared_topics }]` |
-| POST | `/api/search` | `{ query }` | `[{ chunk_id, doc_title, snippet, score }]` |
-| GET | `/api/analytics/history` | — | `[{ query, search_count, rank }]` |
+| POST | `/api/search` | `{ query }` | `{ results: [{ chunk_id, doc_id, doc_title, snippet, score }], cached }` |
+| GET | `/api/analytics/history` | — | `[{ query_text, search_count, query_rank, last_searched, total_searches }]` |
 | GET | `/api/analytics/unsearched` | — | `[{ doc_id, title, uploaded_at }]` |
-| GET | `/api/analytics/top-documents` | — | `[{ title, appearance_count, avg_score }]` |
+| GET | `/api/analytics/top-documents` | — | `[{ doc_id, title, appearance_count, avg_score }]` |
 
 All protected routes require `Authorization: Bearer <token>` header.
 
 ---
 
 ## Data model
+
+Full schema, diagrams and data flows: [relational-schema.md](data/relational-schema.md) (MySQL) and [nosql-schema.md](data/nosql-schema.md) (pgvector, Neo4j, Redis, object storage).
 
 - `User` — has many `Documents`, has many `SearchLogs`
 - `Document` — belongs to `User`, has many `Chunks`, has many `Topics` (via `DocTopics`)
@@ -84,7 +90,7 @@ All protected routes require `Authorization: Bearer <token>` header.
 
 - **Scale:** Single-user to small group (~10 users, ~500 documents max). No horizontal scaling needed.
 - **Performance:** Search must return results within 3 seconds end-to-end including embedding. Upload processing can be async — user gets a confirmation immediately, chunking happens in the background.
-- **Security:** All API routes are JWT-protected except `/register` and `/login`. Flask CORS restricted to Vercel frontend origin only. Passwords hashed with bcrypt, never stored plain.
+- **Security:** All API routes are JWT-protected except `/register` and `/login`. Flask CORS restricted to the frontend origin (`FRONTEND_URL`) only. Passwords hashed with bcrypt, never stored plain.
 - **Chunking:** Sentence-boundary aware, targeting ~200 words per chunk with 1–2 sentence overlap. Implemented with `nltk.sent_tokenize`.
 - **Similarity threshold:** Cosine distance > 0.75 triggers FULLTEXT fallback. Hardcoded for v1, extractable to config later.
 - **No offline support, no mobile, no multi-tenancy** — out of scope for v1.

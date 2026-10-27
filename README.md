@@ -80,6 +80,17 @@ See `docs/` for the full product/architecture docs and `AGENTS.md` for the
 project conventions. Deployment decision: **hybrid — local compute + managed
 data services** — see `docs/decisions/ADR-015-hybrid-local-compute-managed-data.md`.
 
+## Reconciling the data stores
+
+Deleting a document cleans up every store, but the steps after MySQL are best-effort (see [ADR-016](docs/decisions/ADR-016-cross-store-delete.md)). To find, and optionally remove, anything left behind in pgvector, Neo4j or object storage, and to backfill topic tags into MySQL:
+
+```bash
+docker compose exec backend python backend/db/reconcile.py           # dry run: report only
+docker compose exec backend python backend/db/reconcile.py --apply   # remove the orphans it reported
+```
+
+MySQL is the source of truth, so the script refuses to run without `MYSQL_URL`. Always read the dry-run report before running `--apply`.
+
 ## Running the tests
 
 ```bash

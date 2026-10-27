@@ -26,7 +26,7 @@ The stores share IDs that MySQL generates. No store keeps its own copy of owners
 | `chunk_id` | `chunks` | `chunk_vectors.chunk_id` | — | inside the cached value | — |
 | `minio_key` | `documents.minio_key` | — | — | — | the object key |
 
-Every request that names a document first checks in MySQL that the logged-in user owns it, and only then reads the other stores.
+Every request that names a document first checks in MySQL that the logged-in user owns it, and only then reads the other stores. A maintenance script, `backend/db/reconcile.py`, checks that pgvector, Neo4j and object storage agree with MySQL (see [ADR-016](../decisions/ADR-016-cross-store-delete.md)).
 
 ---
 
@@ -133,6 +133,15 @@ RETURN d2.doc_id AS doc_id, d2.title AS title, COUNT(t) AS shared_topics
 ORDER BY shared_topics DESC
 LIMIT 5
 ```
+The results are then filtered against MySQL, so only documents that still exist are returned.
+
+**Delete.** Removes the document with its relationships, then any topic no document is about any more.
+```cypher
+MATCH (:User {user_id: $user_id})-[:UPLOADED]->(d:Document {doc_id: $doc_id})
+DETACH DELETE d
+
+MATCH (t:Topic) WHERE NOT (t)<-[:ABOUT]-() DELETE t
+```
 
 ---
 
@@ -184,8 +193,8 @@ The code uses the standard S3 API (boto3), so the same code runs against MinIO, 
 | Search | read + log | read | | read / write | |
 | Document detail | read | | read | | |
 | View PDF | read | | | | pre-signed link |
-| Related documents | read (ownership) | | read | | |
-| Delete | delete (+ audit trigger) | delete | | clear | delete |
+| Related documents | read (ownership + existence) | | read | | |
+| Delete | delete (+ audit trigger) | delete | delete | clear | delete |
 | Analytics | read | | | | |
 
 ---
@@ -210,6 +219,7 @@ flowchart TB
     D5[(D5 Object storage)]
     D1a[(D1.2 documents)]
     D1b[(D1.3 chunks)]
+    D1t[(D1.4 topics / doc_topics)]
     D2[(D2 chunk_vectors)]
     D3[(D3 Neo4j)]
     D4[(D4 Redis)]
@@ -219,6 +229,7 @@ flowchart TB
     P22 -->|"PDF → {user_id}/{uuid}.pdf"| D5
     P22 -->|object key| P23
     P23 -->|"INSERT (status = processing)"| D1a
+    P23 -->|normalised topic names| D1t
     P23 -->|"doc_id, object key"| S
     P23 -->|clear user's searches| D4
     P23 -->|doc_id, title, topics| P24
@@ -318,12 +329,14 @@ flowchart LR
     P51([5.1 Check ownership])
     P52([5.2 Delete row])
     P53([5.3 Delete vectors])
-    P54([5.4 Delete file])
-    P55([5.5 Clear cache])
+    P56([5.4 Delete graph node])
+    P54([5.5 Delete file])
+    P55([5.6 Clear cache])
 
     D1[(D1 MySQL<br/>documents → chunks → search_results)]
     DA[(D1.7 deletion_audit)]
     D2[(D2 chunk_vectors)]
+    D3[(D3 Neo4j)]
     D5[(D5 Object storage)]
     D4[(D4 Redis)]
 
@@ -334,7 +347,9 @@ flowchart LR
     D1 -. trigger .-> DA
     P52 --> P53
     P53 -->|"DELETE WHERE doc_id"| D2
-    P53 --> P54
+    P53 --> P56
+    P56 -->|"DETACH DELETE Document,<br/>orphan Topics"| D3
+    P56 --> P54
     P54 -->|delete object| D5
     P54 --> P55
     P55 -->|"SCAN + DEL search:{user_id}:*"| D4
@@ -361,6 +376,7 @@ sequenceDiagram
     API->>OS: put {user_id}/{uuid}.pdf
     API->>MY: INSERT documents (processing)
     MY-->>API: doc_id
+    API->>MY: INSERT topics + doc_topics
     API->>RD: clear search:{user_id}:*
     par background
         API-)N4: MERGE User/Document/Topic

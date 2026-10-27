@@ -62,6 +62,24 @@ LIMIT $limit
 """
 
 
+# Remove a deleted document from the graph (Slice 24). Scoped to the owning
+# user, mirroring the read queries. DETACH DELETE drops the node together with
+# its UPLOADED and ABOUT relationships.
+DELETE_DOCUMENT_CYPHER = """
+MATCH (:User {user_id: $user_id})-[:UPLOADED]->(d:Document {doc_id: $doc_id})
+DETACH DELETE d
+"""
+
+
+# Topics are shared across documents, so a Topic is only removed once no
+# Document is ABOUT it any more (Slice 24). Also used by db/reconcile.py.
+DELETE_ORPHAN_TOPICS_CYPHER = """
+MATCH (t:Topic)
+WHERE NOT (t)<-[:ABOUT]-()
+DELETE t
+"""
+
+
 def normalize_topics(topics) -> list:
     """Trim, lowercase, drop empties, and de-duplicate topic names (order-preserving)."""
     seen = set()
@@ -160,6 +178,27 @@ def get_related_documents(doc_id, user_id, limit=5) -> list:
     except Exception as e:
         logger.warning("Related-documents query failed for doc %s: %s", doc_id, e)
         return []
+
+
+def delete_document_from_graph(doc_id, user_id) -> bool:
+    """Remove ``doc_id`` and any Topic left without documents from Neo4j (Slice 24).
+
+    Returns True on success, False if Neo4j is unconfigured/unreachable or the
+    delete fails. Never raises — the document is already gone from MySQL, so a
+    graph failure must not fail the delete; db/reconcile.py cleans up leftovers.
+    """
+    try:
+        driver = get_driver()
+        if driver is None:
+            logger.warning("Neo4j not configured; skipping graph delete for doc %s", doc_id)
+            return False
+        with driver.session() as session:
+            session.run(DELETE_DOCUMENT_CYPHER, doc_id=doc_id, user_id=user_id)
+            session.run(DELETE_ORPHAN_TOPICS_CYPHER)
+        return True
+    except Exception as e:
+        logger.warning("Graph delete failed for doc %s: %s", doc_id, e)
+        return False
 
 
 def write_document_to_graph_async(user_id, email, doc_id, title, topics, sync=False):

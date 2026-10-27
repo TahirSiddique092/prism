@@ -134,7 +134,7 @@ The relational (many-to-many) form of topic tagging.
 | `doc_topics` | `doc_id` | INT | Part of the composite PK; FK → `documents`, `ON DELETE CASCADE` |
 | `doc_topics` | `topic_id` | INT | Part of the composite PK; FK → `topics`, `ON DELETE CASCADE` |
 
-Topic tags are currently written to and queried from the Neo4j graph (see [nosql-schema.md](nosql-schema.md#3-graph-store--neo4j)). These two tables are the relational model of the same relationship.
+Topic tags are written here and to the Neo4j graph at upload time, using the same trimmed, lowercase names. MySQL holds the relational model; Neo4j answers the topic and related-document queries (see [nosql-schema.md](nosql-schema.md#3-graph-store--neo4j)).
 
 ### `search_log`
 One row per search a user runs.
@@ -340,7 +340,7 @@ flowchart LR
     P1 <-->|users| D1
 
     S -->|PDF, topics| P2
-    P2 -->|documents, chunks| D1
+    P2 -->|documents, chunks, topics| D1
     P2 -->|embeddings| D2
     P2 -->|User, Document, Topic| D3
     P2 -->|PDF file| D5
@@ -361,6 +361,7 @@ flowchart LR
     S -->|doc_id| P5
     P5 -->|DELETE + audit| D1
     P5 -->|delete vectors| D2
+    P5 -->|delete Document node| D3
     P5 -->|delete file| D5
     P5 -->|invalidate| D4
 

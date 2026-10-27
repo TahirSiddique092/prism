@@ -65,6 +65,39 @@ def insert_chunks(doc_id: int, chunks_list: list, conn=None):
         if should_close and conn:
             conn.close()
 
+def insert_document_topics(doc_id: int, topic_names: list, conn=None):
+    """Store a document's topic tags in topics / doc_topics (Slice 24).
+
+    ``topic_names`` must already be normalised (graph.normalize_topics) so MySQL
+    and Neo4j hold identical names. INSERT IGNORE makes both statements
+    idempotent: an existing topic or doc_topics pair is left as is.
+    """
+    if not topic_names:
+        return
+
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        cursor.executemany(
+            "INSERT IGNORE INTO topics (name) VALUES (%s)",
+            [(name,) for name in topic_names],
+        )
+        placeholders = ",".join(["%s"] * len(topic_names))
+        query = f"""
+            INSERT IGNORE INTO doc_topics (doc_id, topic_id)
+            SELECT %s, topic_id FROM topics WHERE name IN ({placeholders})
+        """
+        cursor.execute(query, (doc_id, *topic_names))
+        conn.commit()
+        cursor.close()
+    finally:
+        if should_close and conn:
+            conn.close()
+
 import os
 import psycopg2
 
@@ -89,6 +122,33 @@ def get_document_owner(doc_id: int, conn=None):
         if not row:
             return None
         return row[0]
+    finally:
+        if should_close and conn:
+            conn.close()
+
+
+def get_existing_doc_ids(user_id: int, doc_ids: list, conn=None) -> set:
+    """Return the subset of ``doc_ids`` that still exist for this user (Slice 24).
+
+    MySQL is the source of truth, so graph results are filtered through this
+    before being returned to the client.
+    """
+    if not doc_ids:
+        return set()
+
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        placeholders = ",".join(["%s"] * len(doc_ids))
+        query = f"SELECT doc_id FROM documents WHERE user_id = %s AND doc_id IN ({placeholders})"
+        cursor.execute(query, (user_id, *doc_ids))
+        rows = cursor.fetchall()
+        cursor.close()
+        return {row[0] for row in rows}
     finally:
         if should_close and conn:
             conn.close()
