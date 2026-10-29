@@ -52,11 +52,13 @@ def find_user_by_email(email: str, conn=None):
         should_close = True
 
     try:
-        cursor = conn.cursor(dictionary=True)
+        # Prepared statement: user text is sent apart from the SQL (ADR-017).
+        cursor = conn.cursor(prepared=True)
         # Explicit raw SQL query as required by PRISM DBMS guidelines
         query = "SELECT user_id, name, email, password_hash, created_at FROM users WHERE email = %s"
         cursor.execute(query, (email,))
-        user = cursor.fetchone()
+        row = cursor.fetchone()
+        user = dict(zip(cursor.column_names, row)) if row else None
         cursor.close()
         return user
     finally:
@@ -76,7 +78,8 @@ def create_user(name: str, email: str, password_hash: str, conn=None) -> int:
         should_close = True
 
     try:
-        cursor = conn.cursor()
+        # Prepared statement: user text is sent apart from the SQL (ADR-017).
+        cursor = conn.cursor(prepared=True)
         # Explicit raw SQL insert as required by PRISM DBMS guidelines
         query = "INSERT INTO users (name, email, password_hash) VALUES (%s, %s, %s)"
         cursor.execute(query, (name, email, password_hash))

@@ -241,11 +241,13 @@ def test_insert_document_topics_sql_inserts_each_topic_once_and_links_them():
 
     insert_document_topics(42, ["sql", "joins"], conn=conn)
 
-    topics_sql, topic_rows = cursor.executemany.call_args.args
-    assert topics_sql == "INSERT IGNORE INTO topics (name) VALUES (%s)"
-    assert topic_rows == [("sql",), ("joins",)]
+    conn.cursor.assert_called_once_with(prepared=True)
+    (topics_call, link_call) = cursor.execute.call_args_list
+    topics_sql, topic_params = topics_call.args
+    assert topics_sql == "INSERT IGNORE INTO topics (name) VALUES (%s), (%s)"
+    assert topic_params == ["sql", "joins"]
 
-    link_sql, link_params = cursor.execute.call_args.args
+    link_sql, link_params = link_call.args
     assert "INSERT IGNORE INTO doc_topics (doc_id, topic_id)" in link_sql
     assert "SELECT %s, topic_id FROM topics WHERE name IN (%s,%s)" in link_sql
     assert link_params == (42, "sql", "joins")

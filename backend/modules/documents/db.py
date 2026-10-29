@@ -16,7 +16,8 @@ def insert_document(user_id: int, title: str, minio_key: str, conn=None) -> int:
         should_close = True
 
     try:
-        cursor = conn.cursor()
+        # Prepared statement: user text is sent apart from the SQL (ADR-017).
+        cursor = conn.cursor(prepared=True)
         query = "INSERT INTO documents (user_id, title, minio_key) VALUES (%s, %s, %s)"
         cursor.execute(query, (user_id, title, minio_key))
         conn.commit()
@@ -43,22 +44,36 @@ def update_document_status(doc_id: int, status: str, conn=None):
         if should_close and conn:
             conn.close()
 
+# Rows per multi-row INSERT in insert_chunks. 3 placeholders per row keeps each
+# statement far below MySQL's 65,535 prepared-statement placeholder limit.
+CHUNK_INSERT_BATCH = 500
+
+
 def insert_chunks(doc_id: int, chunks_list: list, conn=None):
-    """Bulk insert chunks for a document."""
+    """Bulk insert chunks for a document.
+
+    Uses a prepared multi-row INSERT per batch instead of executemany():
+    executemany() inlines the PDF text into the SQL string, and the driver
+    rewrites any statement whose text contains "DELIMITER ..." (common in
+    DBMS notes), corrupting or breaking the INSERT (ADR-017).
+    """
     if not chunks_list:
         return
-        
+
     should_close = False
     if conn is None:
         conn = get_db_connection()
         should_close = True
 
     try:
-        cursor = conn.cursor()
-        query = "INSERT INTO chunks (doc_id, chunk_text, chunk_index) VALUES (%s, %s, %s)"
+        cursor = conn.cursor(prepared=True)
         # chunks_list is a list of strings
-        data = [(doc_id, text, idx) for idx, text in enumerate(chunks_list)]
-        cursor.executemany(query, data)
+        rows = [(doc_id, text, idx) for idx, text in enumerate(chunks_list)]
+        for start in range(0, len(rows), CHUNK_INSERT_BATCH):
+            batch = rows[start:start + CHUNK_INSERT_BATCH]
+            placeholders = ", ".join(["(%s, %s, %s)"] * len(batch))
+            query = f"INSERT INTO chunks (doc_id, chunk_text, chunk_index) VALUES {placeholders}"
+            cursor.execute(query, [value for row in batch for value in row])
         conn.commit()
         cursor.close()
     finally:
@@ -81,10 +96,11 @@ def insert_document_topics(doc_id: int, topic_names: list, conn=None):
         should_close = True
 
     try:
-        cursor = conn.cursor()
-        cursor.executemany(
-            "INSERT IGNORE INTO topics (name) VALUES (%s)",
-            [(name,) for name in topic_names],
+        # Prepared statements: user text is sent apart from the SQL (ADR-017).
+        cursor = conn.cursor(prepared=True)
+        cursor.execute(
+            "INSERT IGNORE INTO topics (name) VALUES " + ", ".join(["(%s)"] * len(topic_names)),
+            list(topic_names),
         )
         placeholders = ",".join(["%s"] * len(topic_names))
         query = f"""
