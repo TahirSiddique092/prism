@@ -19,7 +19,11 @@ export interface UnsearchedDocumentItem {
 export interface TopDocumentItem {
   doc_id: number;
   title: string;
+  /** Number of searches the document appeared in (slice-25). */
+  search_count: number;
+  /** Number of its passages returned across those searches (up to 10 per search). */
   appearance_count: number;
+  /** Average cosine distance; shown as similarity via formatSimilarity. */
   avg_score: number | null;
 }
 
@@ -91,8 +95,13 @@ export function sortHistoryByRank(items: SearchHistoryItem[]): SearchHistoryItem
 }
 
 /**
- * Sorts top documents by appearance_count descending (highest appearance first).
+ * Sorts top documents by search_count, then appearance_count, both descending
+ * (the backend's order, slice-25).
  */
 export function sortTopDocsByCount(items: TopDocumentItem[]): TopDocumentItem[] {
-  return [...items].sort((a, b) => b.appearance_count - a.appearance_count);
+  return [...items].sort(
+    (a, b) =>
+      (b.search_count ?? 0) - (a.search_count ?? 0) ||
+      b.appearance_count - a.appearance_count
+  );
 }

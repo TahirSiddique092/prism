@@ -12,7 +12,11 @@ from mysql.connector import errors
 
 
 def get_db_config():
-    """Extract MySQL connection parameters from environment variables."""
+    """Extract MySQL connection parameters from environment variables.
+
+    The session time zone is pinned to UTC so TIMESTAMP values always come back
+    in UTC, whatever the server's own setting (slice-25).
+    """
     mysql_url = os.getenv("MYSQL_URL")
     if mysql_url:
         parsed = urllib.parse.urlparse(mysql_url)
@@ -23,6 +27,7 @@ def get_db_config():
             "port": parsed.port or 3306,
             "database": parsed.path.lstrip("/") if parsed.path else "prism",
             "autocommit": True,
+            "time_zone": "+00:00",
         }
 
     return {
@@ -32,6 +37,7 @@ def get_db_config():
         "port": int(os.getenv("MYSQL_PORT", "3306")),
         "database": os.getenv("MYSQL_DATABASE", "prism"),
         "autocommit": True,
+        "time_zone": "+00:00",
     }
 
 

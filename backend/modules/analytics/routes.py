@@ -62,8 +62,8 @@ def unsearched():
 def top_documents():
     """GET /api/analytics/top-documents (Slice 15).
 
-    Returns documents ranked by how often their chunks appear in search results.
-    Response: [{ doc_id, title, appearance_count, avg_score }]
+    Returns documents ranked by how many searches they appeared in (slice-25).
+    Response: [{ doc_id, title, search_count, appearance_count, avg_score }]
     """
     user_id = g.user_id
     try:

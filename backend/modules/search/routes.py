@@ -19,9 +19,14 @@ search_bp = Blueprint("search", __name__, url_prefix="/api/search")
 def search():
     """POST /api/search
     
-    Request body: { "query": "plain English query" }
+    Request body: { "query": "plain English query", "log": true|false (optional) }
     Response: { "results": [{ chunk_id, doc_id, doc_title, snippet, score }],
                 "cached": true|false }
+
+    "log": false runs the search without recording it in search_log /
+    search_results. The search page sends it when it restores results (Back,
+    reload, an opened link) rather than for a search the user submitted, so the
+    analytics count each search once (slice-25). Defaults to true.
     """
     data = request.get_json(silent=True)
     if not data or not isinstance(data, dict):
@@ -31,6 +36,10 @@ def search():
     if query is None or not isinstance(query, str) or not query.strip():
         return jsonify({"error": "Query string is required and cannot be empty"}), 400
 
+    should_log = data.get("log", True)
+    if not isinstance(should_log, bool):
+        return jsonify({"error": "log must be true or false"}), 400
+
     user_id = g.user_id
     clean_query = query.strip()
 
@@ -38,11 +47,12 @@ def search():
         results, cached = execute_semantic_search(user_id=user_id, query=clean_query, limit=10)
 
         # Slice 10: Non-blocking search logging to search_log and search_results
-        try:
-            sync_logging = current_app.config.get("SEARCH_LOGGING_SYNC", False)
-            log_search_async(user_id=user_id, query=clean_query, results=results, sync=sync_logging)
-        except Exception as log_err:
-            logger.error(f"Failed to dispatch search logging for user {user_id}: {log_err}", exc_info=True)
+        if should_log:
+            try:
+                sync_logging = current_app.config.get("SEARCH_LOGGING_SYNC", False)
+                log_search_async(user_id=user_id, query=clean_query, results=results, sync=sync_logging)
+            except Exception as log_err:
+                logger.error(f"Failed to dispatch search logging for user {user_id}: {log_err}", exc_info=True)
 
         return jsonify({"results": results, "cached": cached}), 200
     except Exception as e:

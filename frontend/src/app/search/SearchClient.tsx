@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { formatSimilarity, SIMILARITY_TOOLTIP } from "@/lib/scores";
 
 export interface SearchResult {
   chunk_id: number;
@@ -35,6 +36,12 @@ export default function SearchClient() {
   // Distinguishes "no search run yet" from "searched and got zero results".
   const [searchedQuery, setSearchedQuery] = useState<string | null>(null);
 
+  // The query the user just submitted, if any. Only a submitted search is
+  // logged for analytics; results restored from the URL (Back/Forward, reload,
+  // an opened link) are fetched with log: false so they aren't counted again
+  // (slice-25).
+  const submittedQuery = useRef<string | null>(null);
+
   // When the URL's `?q=` changes (back/forward, a shared link, or a new submit)
   // reset the per-query UI synchronously during render — React's recommended
   // alternative to a state-syncing effect.
@@ -62,13 +69,15 @@ export default function SearchClient() {
     if (!activeQuery) return;
 
     let ignore = false;
+    const log = submittedQuery.current === activeQuery;
+    submittedQuery.current = null;
 
     (async () => {
       try {
         const res = await fetch("/api/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: activeQuery }),
+          body: JSON.stringify({ query: activeQuery, log }),
         });
 
         const data = await res.json().catch(() => ({}));
@@ -118,6 +127,7 @@ export default function SearchClient() {
 
     // Record the query in the URL; the effect above performs the fetch and this
     // creates a history entry so navigating away and back restores the query.
+    submittedQuery.current = trimmed;
     router.push(`/search?q=${encodeURIComponent(trimmed)}`);
   }
 
@@ -131,7 +141,8 @@ export default function SearchClient() {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        // Resubmitting the same query is a real search, so it is logged.
+        body: JSON.stringify({ query, log: true }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -316,9 +327,9 @@ export default function SearchClient() {
                     <span
                       className="result-score"
                       data-testid={`result-score-${result.chunk_id}`}
-                      title="Cosine distance — lower is more similar"
+                      title={SIMILARITY_TOOLTIP}
                     >
-                      {(result.score as number).toFixed(4)}
+                      {formatSimilarity(result.score)}
                     </span>
                   )}
                 </div>

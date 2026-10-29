@@ -321,7 +321,7 @@ def test_raw_sql_unsearched_docs_contract():
     assert len(docs) == 1
     assert docs[0]["doc_id"] == 50
     assert docs[0]["title"] == "Unsearched Research Paper.pdf"
-    assert docs[0]["uploaded_at"] == "2026-10-10T10:00:00"
+    assert docs[0]["uploaded_at"] == "2026-10-10T10:00:00Z"  # UTC, marked with Z (slice-25)
 
 
 def test_raw_sql_unsearched_docs_tuple_fallback():
@@ -349,9 +349,9 @@ def test_raw_sql_top_documents_contract():
 
     mock_cursor.fetchall.return_value = [
         {
-            "user_id": 3,
             "doc_id": 12,
             "title": "Database Normalization.pdf",
+            "search_count": 4,
             "appearance_count": 18,
             "avg_score": 0.81234,
         }
@@ -364,13 +364,14 @@ def test_raw_sql_top_documents_contract():
 
     assert "FROM top_documents" in query_called
     assert "WHERE user_id = %s" in query_called
-    assert "ORDER BY appearance_count DESC" in query_called
+    assert "ORDER BY search_count DESC, appearance_count DESC" in query_called
     assert "LIMIT 10" in query_called
     assert params_called == (3,)
 
     assert len(docs) == 1
     assert docs[0]["doc_id"] == 12
     assert docs[0]["title"] == "Database Normalization.pdf"
+    assert docs[0]["search_count"] == 4
     assert docs[0]["appearance_count"] == 18
     assert docs[0]["avg_score"] == 0.81234
 
@@ -381,15 +382,16 @@ def test_raw_sql_top_documents_tuple_fallback():
     mock_cursor = MagicMock()
     mock_conn.cursor.side_effect = lambda dictionary=False: mock_cursor if not dictionary else (_ for _ in ()).throw(TypeError())
 
-    # Tuple with (user_id, doc_id, title, appearance_count, avg_score)
+    # Tuple with (doc_id, title, search_count, appearance_count, avg_score)
     mock_cursor.fetchall.return_value = [
-        (4, 99, "Tuple Top Doc.pdf", 7, 0.75)
+        (99, "Tuple Top Doc.pdf", 3, 7, 0.75)
     ]
 
     docs = get_top_documents(user_id=4, conn=mock_conn)
     assert len(docs) == 1
     assert docs[0]["doc_id"] == 99
     assert docs[0]["title"] == "Tuple Top Doc.pdf"
+    assert docs[0]["search_count"] == 3
     assert docs[0]["appearance_count"] == 7
     assert docs[0]["avg_score"] == 0.75
 

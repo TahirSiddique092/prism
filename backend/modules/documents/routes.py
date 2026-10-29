@@ -21,6 +21,7 @@ try:
         get_existing_doc_ids,
     )
     from backend.modules.cache import invalidate_user_cache
+    from backend.modules.timeutils import to_utc_iso
     from backend.modules.graph import (
         write_document_to_graph_async,
         get_related_documents,
@@ -45,6 +46,7 @@ except ImportError:
         get_existing_doc_ids,
     )
     from modules.cache import invalidate_user_cache
+    from modules.timeutils import to_utc_iso
     from modules.graph import (
         write_document_to_graph_async,
         get_related_documents,
@@ -171,19 +173,13 @@ def get_document_detail(doc_id: int):
         if not doc:
             return jsonify({"error": "Document not found"}), 404
 
-        uploaded_at_val = doc.get("uploaded_at")
-        if hasattr(uploaded_at_val, "isoformat"):
-            uploaded_at_str = uploaded_at_val.isoformat()
-        else:
-            uploaded_at_str = str(uploaded_at_val) if uploaded_at_val is not None else None
-
         chunk_count = get_document_chunk_count(doc_id)
         topics = get_document_topics(doc_id, user_id)
 
         return jsonify({
             "doc_id": doc["doc_id"],
             "title": doc.get("title"),
-            "uploaded_at": uploaded_at_str,
+            "uploaded_at": to_utc_iso(doc.get("uploaded_at")),
             "status": doc.get("status") or "ready",
             "chunk_count": chunk_count,
             "topics": topics,

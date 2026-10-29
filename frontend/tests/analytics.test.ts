@@ -193,6 +193,7 @@ describe("Slice 19 — Frontend Analytics Pages & API Handlers", () => {
         {
           doc_id: 1,
           title: "Distributed Systems.pdf",
+          search_count: 3,
           appearance_count: 9,
           avg_score: 0.3541,
         },
@@ -223,6 +224,7 @@ describe("Slice 19 — Frontend Analytics Pages & API Handlers", () => {
       assert.strictEqual(forwardedAuth, `Bearer ${mockToken}`);
       assert.strictEqual(data.length, 1);
       assert.strictEqual(data[0].doc_id, 1);
+      assert.strictEqual(data[0].search_count, 3);
       assert.strictEqual(data[0].appearance_count, 9);
     });
 
@@ -343,23 +345,23 @@ describe("Slice 19 — Frontend Analytics Pages & API Handlers", () => {
   });
 
   describe("8. Page invariants: /analytics/top-documents", () => {
-    it("sorts documents by appearance count descending", () => {
+    it("sorts documents by search count, then appearance count, descending (slice-25)", () => {
       const raw: TopDocumentItem[] = [
-        { doc_id: 1, title: "Doc A", appearance_count: 2, avg_score: 0.4 },
-        { doc_id: 2, title: "Doc B", appearance_count: 10, avg_score: 0.2 },
-        { doc_id: 3, title: "Doc C", appearance_count: 6, avg_score: 0.3 },
+        { doc_id: 1, title: "Doc A", search_count: 3, appearance_count: 4, avg_score: 0.4 },
+        { doc_id: 2, title: "Doc B", search_count: 2, appearance_count: 20, avg_score: 0.2 },
+        { doc_id: 3, title: "Doc C", search_count: 3, appearance_count: 9, avg_score: 0.3 },
       ];
       const sorted = sortTopDocsByCount(raw);
-      assert.strictEqual(sorted[0].appearance_count, 10);
-      assert.strictEqual(sorted[0].title, "Doc B");
-      assert.strictEqual(sorted[1].appearance_count, 6);
-      assert.strictEqual(sorted[2].appearance_count, 2);
+      // One search can return 10 passages of a document, so passages alone
+      // would put Doc B first although it came up in fewer searches.
+      assert.deepStrictEqual(sorted.map((d) => d.title), ["Doc C", "Doc A", "Doc B"]);
     });
 
     it("exposes title, appearance count, and handles both numeric and null average score", () => {
       const itemWithScore: TopDocumentItem = {
         doc_id: 5,
         title: "Database Internals.pdf",
+        search_count: 2,
         appearance_count: 12,
         avg_score: 0.28543,
       };
@@ -371,10 +373,44 @@ describe("Slice 19 — Frontend Analytics Pages & API Handlers", () => {
       const itemWithoutScore: TopDocumentItem = {
         doc_id: 6,
         title: "SQL Reference.pdf",
+        search_count: 1,
         appearance_count: 1,
         avg_score: null,
       };
       assert.strictEqual(itemWithoutScore.avg_score, null);
+    });
+  });
+
+  describe("9. Time zones (slice-25)", () => {
+    // The API sends UTC timestamps marked with Z; the browser shows local time.
+    function inTimeZone(tz: string, fn: () => void) {
+      const previous = process.env.TZ;
+      process.env.TZ = tz;
+      try {
+        fn();
+      } finally {
+        if (previous === undefined) delete process.env.TZ;
+        else process.env.TZ = previous;
+      }
+    }
+
+    it("shows a search made at 21:30 IST as 9:30 PM in Asia/Kolkata", () => {
+      inTimeZone("Asia/Kolkata", () => {
+        assert.strictEqual(formatDateTime("2026-10-29T16:00:00Z"), "Oct 29, 2026, 9:30 PM");
+      });
+    });
+
+    it("uses the local calendar date near midnight", () => {
+      inTimeZone("Asia/Kolkata", () => {
+        // 19:00 UTC on 29 Oct is 00:30 IST on 30 Oct
+        assert.strictEqual(formatDate("2026-10-29T19:00:00Z"), "Oct 30, 2026");
+      });
+    });
+
+    it("would be 5 h 30 min off if the Z were missing (the old bug)", () => {
+      inTimeZone("Asia/Kolkata", () => {
+        assert.strictEqual(formatDateTime("2026-10-29T16:00:00"), "Oct 29, 2026, 4:00 PM");
+      });
     });
   });
 });
