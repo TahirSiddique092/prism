@@ -1,3 +1,4 @@
+import bisect
 import logging
 
 import fitz  # PyMuPDF
@@ -32,30 +33,33 @@ def count_words(text: str) -> int:
     return len(text.split())
 
 
-def chunk_sentences(sentences: list) -> list:
+def _chunk_with_bounds(sentences: list) -> list:
     """Group sentences into overlapping ~200-word chunks (hard cap 250 words).
+
+    Returns [(chunk_text, first, last)], where ``first`` and ``last`` say where
+    the chunk starts and ends: (sentence_index, None) for a whole sentence, or
+    (sentence_index, word_index) for a word window cut from one oversized
+    sentence. chunk_sentences() returns just the texts; chunk_pages() turns
+    the bounds into page numbers (slice-27).
 
     Guarantees termination: the sentence index advances on every iteration, so
     an oversized sentence can never cause an infinite loop. A single sentence
     longer than the hard cap is split into fixed word windows.
     """
+    stripped = [s.strip() for s in sentences]
     chunks = []
-    current = []          # sentences accumulated for the in-progress chunk
+    current = []          # indices of the sentences in the in-progress chunk
     current_words = 0
 
-    def flush():
-        nonlocal current, current_words
-        if current:
-            text = " ".join(current)
-            if count_words(text) >= MIN_CHUNK_WORDS:
-                chunks.append(text)
-        current = []
-        current_words = 0
+    def emit(indices):
+        text = " ".join(stripped[k] for k in indices)
+        if count_words(text) >= MIN_CHUNK_WORDS:
+            chunks.append((text, (indices[0], None), (indices[-1], None)))
 
     i = 0
     n = len(sentences)
     while i < n:
-        sentence = sentences[i].strip()
+        sentence = stripped[i]
         if not sentence:
             i += 1
             continue
@@ -65,10 +69,14 @@ def chunk_sentences(sentences: list) -> list:
         # A single sentence larger than the cap can never fit a chunk; emit it
         # as its own fixed-size word windows so downstream limits still hold.
         if sentence_words > MAX_WORDS:
-            flush()
+            if current:
+                emit(current)
+            current = []
+            current_words = 0
             words = sentence.split()
             for start in range(0, len(words), MAX_WORDS):
-                chunks.append(" ".join(words[start:start + MAX_WORDS]))
+                end = min(start + MAX_WORDS, len(words))
+                chunks.append((" ".join(words[start:end]), (i, start), (i, end - 1)))
             i += 1
             continue
 
@@ -76,33 +84,113 @@ def chunk_sentences(sentences: list) -> list:
             # Finalise the current chunk, then start a new one that carries a
             # small overlap for context — but always consume THIS sentence so
             # the loop makes forward progress.
-            text = " ".join(current)
-            if count_words(text) >= MIN_CHUNK_WORDS:
-                chunks.append(text)
+            emit(current)
 
             overlap = current[-OVERLAP_SENTENCES:]
-            overlap_words = sum(count_words(s) for s in overlap)
+            overlap_words = sum(count_words(stripped[k]) for k in overlap)
             # Drop the overlap if carrying it plus this sentence would blow the
             # hard cap (keeps every chunk <= MAX_WORDS).
             if overlap_words + sentence_words > MAX_WORDS:
                 overlap = []
                 overlap_words = 0
 
-            current = overlap + [sentence]
+            current = overlap + [i]
             current_words = overlap_words + sentence_words
-            i += 1
         else:
-            current.append(sentence)
+            current.append(i)
             current_words += sentence_words
-            i += 1
+        i += 1
 
     # Finalise trailing chunk.
     if current:
-        text = " ".join(current)
-        if count_words(text) >= MIN_CHUNK_WORDS:
-            chunks.append(text)
+        emit(current)
 
     return chunks
+
+
+def chunk_sentences(sentences: list) -> list:
+    """Group sentences into overlapping ~200-word chunks (hard cap 250 words)."""
+    return [text for text, _, _ in _chunk_with_bounds(sentences)]
+
+
+def _word_spans(text: str) -> list:
+    """(start, end) of each word, splitting exactly like str.split()."""
+    spans = []
+    start = None
+    for pos, char in enumerate(text):
+        if char.isspace():
+            if start is not None:
+                spans.append((start, pos))
+                start = None
+        elif start is None:
+            start = pos
+    if start is not None:
+        spans.append((start, len(text)))
+    return spans
+
+
+def chunk_pages(page_texts: list, sentences: list) -> list:
+    """Chunk a document and find the pages each chunk starts and ends on (slice-27).
+
+    ``page_texts`` are joined with single spaces, as before sentence splitting,
+    and ``sentences`` is nltk.sent_tokenize of that text. Punkt returns pieces
+    of the text in order, so each sentence is located with a forward search.
+    Returns [(chunk_text, page_start, page_end)], pages 1-based, or None for a
+    chunk whose position can't be found. Chunk texts are exactly those of
+    chunk_sentences(sentences).
+    """
+    text = " ".join(page_texts)
+    page_starts = []
+    offset = 0
+    for page_text in page_texts:
+        page_starts.append(offset)
+        offset += len(page_text) + 1
+
+    spans = []
+    cursor = 0
+    for sentence in sentences:
+        piece = sentence.strip()
+        start = text.find(piece, cursor) if piece else -1
+        if start < 0:
+            spans.append(None)
+            continue
+        spans.append((start, start + len(piece)))
+        cursor = start + len(piece)
+
+    def char_at(bound, at_end):
+        sentence_index, word_index = bound
+        span = spans[sentence_index]
+        if span is None:
+            return None
+        if word_index is None:
+            return span[1] - 1 if at_end else span[0]
+        word_start, word_end = _word_spans(sentences[sentence_index].strip())[word_index]
+        return span[0] + (word_end - 1 if at_end else word_start)
+
+    def page_of(char):
+        return None if char is None else bisect.bisect_right(page_starts, char)
+
+    return [
+        (chunk_text, page_of(char_at(first, False)), page_of(char_at(last, True)))
+        for chunk_text, first, last in _chunk_with_bounds(sentences)
+    ]
+
+
+def extract_page_texts(pdf_bytes: bytes) -> list:
+    """The text of each page of a PDF, in page order."""
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    return [page.get_text() for page in doc]
+
+
+def chunk_document(page_texts: list) -> list:
+    """Split a document's pages into chunks: [(chunk_text, page_start, page_end)].
+
+    Shared by process_document and the page backfill (backend/db/backfill_chunk_pages.py),
+    so both produce exactly the same chunks.
+    """
+    _ensure_nltk()
+    sentences = nltk.sent_tokenize(" ".join(page_texts))
+    return chunk_pages(page_texts, sentences)
 
 def process_document(doc_id: int, minio_key: str):
     """Background task to extract text, chunk it, and save to database."""
@@ -116,23 +204,20 @@ def process_document(doc_id: int, minio_key: str):
         return
 
     try:
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        full_text = []
-        for page in doc:
-            full_text.append(page.get_text())
-
-        text = " ".join(full_text)
-        if not text.strip():
+        page_texts = extract_page_texts(pdf_bytes)
+        if not " ".join(page_texts).strip():
             # No text layer
             update_document_status(doc_id, 'error')
             return
 
-        _ensure_nltk()
-        sentences = nltk.sent_tokenize(text)
-        chunks = chunk_sentences(sentences)
+        chunks = chunk_document(page_texts)
 
-        # Insert raw chunks into MySQL
-        insert_chunks(doc_id, chunks)
+        # Insert raw chunks, with the pages each one covers, into MySQL
+        insert_chunks(
+            doc_id,
+            [chunk_text for chunk_text, _, _ in chunks],
+            pages=[(page_start, page_end) for _, page_start, page_end in chunks],
+        )
 
     except Exception as e:
         logger.error(f"Failed to process document {doc_id}: {e}")

@@ -91,6 +91,17 @@ docker compose exec backend python backend/db/reconcile.py --apply   # remove th
 
 MySQL is the source of truth, so the script refuses to run without `MYSQL_URL`. Always read the dry-run report before running `--apply`.
 
+## Backfilling passage pages
+
+Search results open the PDF at the passage's page (slice-27). Documents processed before that change have no page numbers stored, so their results open at page 1. To fill them in:
+
+```bash
+docker compose exec backend python backend/db/backfill_chunk_pages.py           # dry run: report only
+docker compose exec backend python backend/db/backfill_chunk_pages.py --apply   # write the pages
+```
+
+The script re-splits each PDF exactly as the worker does and only writes pages when the result matches the stored chunks; anything else is reported and left alone.
+
 ## Running the tests
 
 ```bash

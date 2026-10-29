@@ -44,7 +44,7 @@ def execute_semantic_search(user_id: int, query: str, limit: int = 10) -> Tuple[
     4. Embed query using all-MiniLM-L6-v2.
     5. Search pgvector ordered by cosine distance (embedding <=> query_vec).
     6. Retrieve chunk snippet and document title metadata from MySQL.
-    7. Assemble results [{ chunk_id, doc_id, doc_title, snippet, score }].
+    7. Assemble results [{ chunk_id, doc_id, doc_title, snippet, score, page }].
     8. Store results in Redis cache.
     9. Return results.
     """
@@ -108,6 +108,8 @@ def execute_semantic_search(user_id: int, query: str, limit: int = 10) -> Tuple[
                 "doc_title": meta["doc_title"],
                 "snippet": meta["snippet"],
                 "score": match["score"],
+                # First page of the passage, or None if unknown (slice-27)
+                "page": meta.get("page"),
             })
 
     # 8. Write to cache

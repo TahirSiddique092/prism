@@ -11,7 +11,7 @@ Make PRISM dependable for everyday studying. Every store agrees with MySQL. The 
 - [x]  `slice-24-cross-store-consistency` — Cross-store consistency fixes — **Unassigned**
 - [x]  `slice-25-analytics-accuracy` — Analytics accuracy: time zones, restored searches, search counts, one score scale — **Unassigned**
 - [x]  `slice-26-pdf-viewer` — pdf.js viewer with full screen and open in new tab — **Unassigned**
-- [ ]  `slice-27-jump-to-passage` — Open a search result at its page, with the passage highlighted — **Unassigned**
+- [x]  `slice-27-jump-to-passage` — Open a search result at its page, with the passage highlighted — **Unassigned**
 - [ ]  `slice-28-dashboard-status-retry` — Live processing status, retry failed documents — **Unassigned**
 - [x]  `slice-29-search-cache-speed` — Reuse Redis and Postgres connections so cached searches are fast — **Unassigned**
 - [x]  `slice-30-prism-favicon` — PRISM favicon instead of the Next.js default — **Unassigned**

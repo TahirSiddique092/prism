@@ -50,6 +50,8 @@ erDiagram
         INT doc_id FK
         TEXT chunk_text "FULLTEXT indexed"
         INT chunk_index
+        INT page_start
+        INT page_end
     }
     topics {
         INT topic_id PK
@@ -123,6 +125,7 @@ The searchable text of a document, split into overlapping pieces.
 | `doc_id` | INT | FK → `documents`, `ON DELETE CASCADE` |
 | `chunk_text` | TEXT | **FULLTEXT index** for keyword search |
 | `chunk_index` | INT | Position of the chunk within the document (0, 1, 2 …) |
+| `page_start`, `page_end` | INT, nullable | PDF pages the chunk starts and ends on (1-based), so a search result opens at its passage. `NULL` for chunks stored before this was recorded, until backfilled. |
 
 ### `topics` and `doc_topics`
 The relational (many-to-many) form of topic tagging.

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatSimilarity, SIMILARITY_TOOLTIP } from "@/lib/scores";
+import { passageHref } from "@/lib/passage";
 
 export interface SearchResult {
   chunk_id: number;
@@ -12,6 +13,8 @@ export interface SearchResult {
   snippet: string;
   /** Raw cosine distance (lower = closer); null when the FULLTEXT fallback was used. */
   score: number | null;
+  /** First page of the passage; null or missing when unknown (slice-27). */
+  page?: number | null;
 }
 
 /** True when the result came from the MySQL FULLTEXT fallback rather than pgvector. */
@@ -285,7 +288,7 @@ export default function SearchClient() {
           {results.map((result) => (
             <Link
               key={result.chunk_id}
-              href={`/documents/${result.doc_id}`}
+              href={passageHref(result.doc_id, result.chunk_id, result.page)}
               className="result-card"
               data-testid={`result-card-${result.chunk_id}`}
             >

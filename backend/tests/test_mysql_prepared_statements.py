@@ -93,11 +93,24 @@ def test_insert_chunks_sends_one_prepared_multi_row_insert():
     conn.cursor.assert_called_once_with(prepared=True)
     cursor.executemany.assert_not_called()
     sql, params = cursor.execute.call_args.args
-    assert sql == "INSERT INTO chunks (doc_id, chunk_text, chunk_index) VALUES (%s, %s, %s), (%s, %s, %s)"
+    assert sql == (
+        "INSERT INTO chunks (doc_id, chunk_text, chunk_index, page_start, page_end) "
+        "VALUES (%s, %s, %s, %s, %s), (%s, %s, %s, %s, %s)"
+    )
     # The text is a parameter, never part of the SQL string
     assert "DELIMITER" not in sql
-    assert params == [3, TRIGGER_NOTES, 0, 3, HIERARCHY_NOTES, 1]
+    # No pages given: stored as NULL (slice-27)
+    assert params == [3, TRIGGER_NOTES, 0, None, None, 3, HIERARCHY_NOTES, 1, None, None]
     conn.commit.assert_called_once()
+
+
+def test_insert_chunks_stores_pages_with_each_chunk():
+    conn, cursor = _mock_conn()
+
+    insert_chunks(3, [TRIGGER_NOTES, HIERARCHY_NOTES], conn=conn, pages=[(4, 5), (5, 5)])
+
+    _, params = cursor.execute.call_args.args
+    assert params == [3, TRIGGER_NOTES, 0, 4, 5, 3, HIERARCHY_NOTES, 1, 5, 5]
 
 
 def test_insert_chunks_batches_large_documents_and_keeps_indexes():
@@ -108,10 +121,10 @@ def test_insert_chunks_batches_large_documents_and_keeps_indexes():
     insert_chunks(9, chunks, conn=conn)
 
     calls = cursor.execute.call_args_list
-    assert [len(c.args[1]) // 3 for c in calls] == [CHUNK_INSERT_BATCH, CHUNK_INSERT_BATCH, 7]
-    indexes = [v for c in calls for v in c.args[1][2::3]]
+    assert [len(c.args[1]) // 5 for c in calls] == [CHUNK_INSERT_BATCH, CHUNK_INSERT_BATCH, 7]
+    indexes = [v for c in calls for v in c.args[1][2::5]]
     assert indexes == list(range(total))
-    texts = [v for c in calls for v in c.args[1][1::3]]
+    texts = [v for c in calls for v in c.args[1][1::5]]
     assert texts == chunks
     conn.commit.assert_called_once()
 
@@ -168,7 +181,7 @@ SHADOW_TABLES = [
     " title VARCHAR(255) NOT NULL, minio_key VARCHAR(255) NOT NULL,"
     " uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, status VARCHAR(50) DEFAULT 'processing')",
     "CREATE TEMPORARY TABLE chunks (chunk_id INT AUTO_INCREMENT PRIMARY KEY, doc_id INT NOT NULL,"
-    " chunk_text TEXT NOT NULL, chunk_index INT NOT NULL)",
+    " chunk_text TEXT NOT NULL, chunk_index INT NOT NULL, page_start INT NULL, page_end INT NULL)",
     "CREATE TEMPORARY TABLE topics (topic_id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL UNIQUE)",
     "CREATE TEMPORARY TABLE doc_topics (doc_id INT NOT NULL, topic_id INT NOT NULL, PRIMARY KEY (doc_id, topic_id))",
     "CREATE TEMPORARY TABLE search_log (log_id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL,"

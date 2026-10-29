@@ -19,6 +19,7 @@ try:
         delete_chunk_vectors,
         insert_document_topics,
         get_existing_doc_ids,
+        get_chunk,
     )
     from backend.modules.cache import invalidate_user_cache
     from backend.modules.timeutils import to_utc_iso
@@ -44,6 +45,7 @@ except ImportError:
         delete_chunk_vectors,
         insert_document_topics,
         get_existing_doc_ids,
+        get_chunk,
     )
     from modules.cache import invalidate_user_cache
     from modules.timeutils import to_utc_iso
@@ -127,6 +129,25 @@ def get_document_view_url(doc_id: int):
     except Exception as e:
         logger.error(f"Error retrieving view url for doc {doc_id}: {e}")
         return jsonify({"error": f"Failed to retrieve document view URL: {str(e)}"}), 500
+
+@documents_bp.route("/<int:doc_id>/chunks/<int:chunk_id>", methods=["GET"])
+def get_document_chunk(doc_id: int, chunk_id: int):
+    """One passage of a document, with the pages it covers (slice-27).
+
+    Used to open a search result at its passage and highlight it.
+    Response: { chunk_id, chunk_text, page_start, page_end } (pages may be null)
+    Returns 404 unless the chunk is part of this document and the document
+    belongs to the signed-in user.
+    """
+    user_id = g.user_id
+    try:
+        chunk = get_chunk(doc_id, chunk_id, user_id)
+        if not chunk:
+            return jsonify({"error": "Passage not found"}), 404
+        return jsonify(chunk), 200
+    except Exception as e:
+        logger.error(f"Error retrieving chunk {chunk_id} of doc {doc_id}: {e}")
+        return jsonify({"error": "Failed to retrieve passage"}), 500
 
 @documents_bp.route("/<int:doc_id>/related", methods=["GET"])
 def get_related_documents_route(doc_id: int):

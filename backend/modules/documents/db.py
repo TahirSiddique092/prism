@@ -48,13 +48,16 @@ def update_document_status(doc_id: int, status: str, conn=None):
         if should_close and conn:
             conn.close()
 
-# Rows per multi-row INSERT in insert_chunks. 3 placeholders per row keeps each
+# Rows per multi-row INSERT in insert_chunks. 5 placeholders per row keeps each
 # statement far below MySQL's 65,535 prepared-statement placeholder limit.
 CHUNK_INSERT_BATCH = 500
 
 
-def insert_chunks(doc_id: int, chunks_list: list, conn=None):
+def insert_chunks(doc_id: int, chunks_list: list, conn=None, pages=None):
     """Bulk insert chunks for a document.
+
+    ``pages`` is a list of (page_start, page_end) per chunk, 1-based (slice-27).
+    Without it, or for a chunk whose pages are unknown, they are stored as NULL.
 
     Uses a prepared multi-row INSERT per batch instead of executemany():
     executemany() inlines the PDF text into the SQL string, and the driver
@@ -63,6 +66,8 @@ def insert_chunks(doc_id: int, chunks_list: list, conn=None):
     """
     if not chunks_list:
         return
+    if pages is None:
+        pages = [(None, None)] * len(chunks_list)
 
     should_close = False
     if conn is None:
@@ -72,11 +77,17 @@ def insert_chunks(doc_id: int, chunks_list: list, conn=None):
     try:
         cursor = conn.cursor(prepared=True)
         # chunks_list is a list of strings
-        rows = [(doc_id, text, idx) for idx, text in enumerate(chunks_list)]
+        rows = [
+            (doc_id, text, idx, page_start, page_end)
+            for idx, (text, (page_start, page_end)) in enumerate(zip(chunks_list, pages))
+        ]
         for start in range(0, len(rows), CHUNK_INSERT_BATCH):
             batch = rows[start:start + CHUNK_INSERT_BATCH]
-            placeholders = ", ".join(["(%s, %s, %s)"] * len(batch))
-            query = f"INSERT INTO chunks (doc_id, chunk_text, chunk_index) VALUES {placeholders}"
+            placeholders = ", ".join(["(%s, %s, %s, %s, %s)"] * len(batch))
+            query = (
+                "INSERT INTO chunks (doc_id, chunk_text, chunk_index, page_start, page_end) "
+                f"VALUES {placeholders}"
+            )
             cursor.execute(query, [value for row in batch for value in row])
         conn.commit()
         cursor.close()
@@ -160,6 +171,36 @@ def get_existing_doc_ids(user_id: int, doc_ids: list, conn=None) -> set:
         rows = cursor.fetchall()
         cursor.close()
         return {row[0] for row in rows}
+    finally:
+        if should_close and conn:
+            conn.close()
+
+
+def get_chunk(doc_id: int, chunk_id: int, user_id: int, conn=None) -> dict | None:
+    """One chunk of one of the user's documents, with its pages (slice-27).
+
+    Returns None unless the chunk belongs to ``doc_id`` and that document
+    belongs to ``user_id``.
+    """
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        query = """
+            SELECT c.chunk_id, c.chunk_text, c.page_start, c.page_end
+            FROM chunks c
+            JOIN documents d ON c.doc_id = d.doc_id
+            WHERE c.chunk_id = %s AND c.doc_id = %s AND d.user_id = %s
+        """
+        cursor.execute(query, (chunk_id, doc_id, user_id))
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return None
+        return {"chunk_id": row[0], "chunk_text": row[1], "page_start": row[2], "page_end": row[3]}
     finally:
         if should_close and conn:
             conn.close()

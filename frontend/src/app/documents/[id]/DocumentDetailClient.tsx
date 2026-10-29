@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import LocalTime from "@/components/LocalTime";
 import PdfViewer from "@/components/PdfViewer";
+import { parsePassageParams, type PassageHighlight } from "@/lib/passage";
 
 export interface DocumentDetail {
   doc_id: number;
@@ -18,6 +20,13 @@ export interface RelatedDocument {
   doc_id: number;
   title: string;
   shared_topics: number;
+}
+
+/** A search result's passage, as returned by /api/documents/:id/chunks/:chunkId. */
+interface Passage {
+  text: string;
+  pageStart: number | null;
+  pageEnd: number | null;
 }
 
 interface DocumentDetailClientProps {
@@ -62,6 +71,52 @@ export default function DocumentDetailClient({
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState<string | null>(null);
+
+  // Opened from a search result (?chunk=&page=): fetch that passage, open the
+  // viewer at its page and highlight it (slice-27). State is tagged with the
+  // chunk it belongs to, so following another result never shows stale data.
+  const target = parsePassageParams(useSearchParams());
+  const targetChunk = target?.chunkId ?? null;
+  const [passageState, setPassageState] = useState<{ chunkId: number; passage: Passage | null } | null>(null);
+  const [highlightResult, setHighlightResult] = useState<{ chunkId: number; found: boolean } | null>(null);
+  const [clearedChunk, setClearedChunk] = useState<number | null>(null);
+
+  const passageSettled = targetChunk === null || passageState?.chunkId === targetChunk;
+  const passage = targetChunk !== null && passageState?.chunkId === targetChunk ? passageState.passage : null;
+  const highlightOn = clearedChunk !== targetChunk;
+  const found = highlightResult?.chunkId === targetChunk ? highlightResult.found : null;
+
+  const highlight = useMemo<PassageHighlight | null>(
+    () =>
+      passage && passage.pageStart !== null && highlightOn
+        ? { text: passage.text, pageStart: passage.pageStart, pageEnd: passage.pageEnd ?? passage.pageStart }
+        : null,
+    [passage, highlightOn]
+  );
+  const initialPage = passage?.pageStart ?? target?.page ?? null;
+
+  useEffect(() => {
+    if (targetChunk === null) return;
+    let cancelled = false;
+    fetch(`/api/documents/${detail.doc_id}/chunks/${targetChunk}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null)
+      .then((data) => {
+        if (cancelled) return;
+        const loaded: Passage | null =
+          data && typeof data.chunk_text === "string"
+            ? {
+                text: data.chunk_text,
+                pageStart: typeof data.page_start === "number" ? data.page_start : null,
+                pageEnd: typeof data.page_end === "number" ? data.page_end : null,
+              }
+            : null;
+        setPassageState({ chunkId: targetChunk, passage: loaded });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [detail.doc_id, targetChunk]);
 
   // Fetch the pre-signed URL fresh on mount so the embedded viewer never points
   // at a link that expired between server render and user interaction.
@@ -208,7 +263,33 @@ export default function DocumentDetailClient({
             </span>
           </div>
           <div className="detail-viewer-body">
-            {pdfLoading && (
+            {highlight && (
+              <div className="passage-banner" role="status" data-testid="passage-banner">
+                {found === null && <span>Finding the passage from your search on page {highlight.pageStart}…</span>}
+                {found === true && (
+                  <span>
+                    Showing the passage from your search (page{" "}
+                    {highlight.pageStart === highlight.pageEnd
+                      ? highlight.pageStart
+                      : `${highlight.pageStart}–${highlight.pageEnd}`}
+                    )
+                  </span>
+                )}
+                {found === false && (
+                  <span>Couldn&apos;t highlight the passage. Showing page {highlight.pageStart}.</span>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setClearedChunk(targetChunk)}
+                  data-testid="clear-highlight"
+                >
+                  Clear highlight
+                </button>
+              </div>
+            )}
+
+            {(pdfLoading || (!pdfError && !passageSettled)) && (
               <div className="detail-viewer-state" data-testid="pdf-loading">
                 <span className="spinner spinner-lg" style={{ marginBottom: 12 }} />
                 <p style={{ color: "var(--color-text-muted)", fontSize: "0.875rem" }}>
@@ -249,12 +330,17 @@ export default function DocumentDetailClient({
               </div>
             )}
 
-            {!pdfLoading && !pdfError && viewUrl && (
+            {!pdfLoading && !pdfError && viewUrl && passageSettled && (
               <PdfViewer
-                key={viewUrl}
+                key={`${viewUrl}#${targetChunk ?? ""}`}
                 url={viewUrl}
                 title={detail.title}
                 openHref={`/api/documents/${detail.doc_id}/open`}
+                initialPage={initialPage}
+                highlight={highlight}
+                onHighlightResult={(isFound) =>
+                  targetChunk !== null && setHighlightResult({ chunkId: targetChunk, found: isFound })
+                }
               />
             )}
           </div>
