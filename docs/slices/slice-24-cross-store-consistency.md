@@ -1,6 +1,6 @@
 # slice-24 — Cross-store consistency fixes
 
-**Sprint:** Unscheduled (proposed Sprint 7 — Hardening)
+**Sprint:** 7 — Hardening and UX
 **Module:** documents, graph, infra
 
 ## What to build
