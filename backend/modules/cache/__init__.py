@@ -3,6 +3,7 @@ from .service import (
     get_redis_client,
     get_search_cache_key,
     invalidate_user_cache,
+    reset_redis_client,
     set_cached_search,
 )
 
@@ -11,5 +12,6 @@ __all__ = [
     "get_redis_client",
     "get_search_cache_key",
     "invalidate_user_cache",
+    "reset_redis_client",
     "set_cached_search",
 ]

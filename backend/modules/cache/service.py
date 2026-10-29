@@ -1,7 +1,8 @@
 """Redis Cache service for PRISM (Slice 08 / Slice 09 / Slice 11).
 
 Provides:
-- get_redis_client: Connects to Redis using REDIS_URL.
+- get_redis_client: Returns the process-wide Redis client for REDIS_URL (slice-29).
+- reset_redis_client: Closes and clears that client (tests).
 - get_search_cache_key: Hashes query and scopes by user_id -> search:{user_id}:{md5(normalized_query)}.
 - get_cached_search: Returns cached search results if present, or None.
 - set_cached_search: Caches search results with TTL (default 3600 seconds).
@@ -11,15 +12,63 @@ import hashlib
 import json
 import logging
 import os
+import threading
 
 logger = logging.getLogger(__name__)
 
+_client = None
+_client_lock = threading.Lock()
+
 
 def get_redis_client():
-    """Return a Redis client instance configured from REDIS_URL."""
-    import redis
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    return redis.from_url(redis_url, decode_responses=True)
+    """Return the shared Redis client configured from REDIS_URL.
+
+    The client is created once, on first use, and its connection pool is reused
+    by every request and worker thread. Building a client per call opened a new
+    TCP + TLS + AUTH connection each time (~1.4 s to Upstash) — slice-29.
+
+    - health_check_interval: a connection idle for 30 s is PINGed before use, so
+      one the server dropped is replaced instead of failing the command.
+    - retry: a command that hits a dropped connection is retried once on a new
+      one (set explicitly because the default differs across redis-py versions).
+    - socket timeouts keep an unreachable Redis from stalling a search.
+    """
+    global _client
+    if _client is not None:
+        return _client
+
+    with _client_lock:
+        # Re-check inside the lock: another thread may have built it meanwhile.
+        if _client is not None:
+            return _client
+
+        import redis
+        from redis.backoff import NoBackoff
+        from redis.retry import Retry
+
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        _client = redis.from_url(
+            redis_url,
+            decode_responses=True,
+            health_check_interval=30,
+            retry=Retry(NoBackoff(), 1),
+            retry_on_error=[redis.exceptions.ConnectionError, redis.exceptions.TimeoutError],
+            socket_connect_timeout=3,
+            socket_timeout=3,
+        )
+    return _client
+
+
+def reset_redis_client():
+    """Close and clear the shared client. Primarily used in tests."""
+    global _client
+    with _client_lock:
+        client, _client = _client, None
+    if client is not None:
+        try:
+            client.close()
+        except Exception:
+            pass
 
 
 def get_search_cache_key(user_id: int, query: str) -> str:
