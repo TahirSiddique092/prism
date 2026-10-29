@@ -2,8 +2,10 @@
 
 try:
     from backend.modules.auth.db import get_db_connection
+    from backend.modules.postgres import run_pg
 except ImportError:
     from modules.auth.db import get_db_connection
+    from modules.postgres import run_pg
 
 def insert_document(user_id: int, title: str, minio_key: str, conn=None) -> int:
     """Insert a new document record into MySQL using raw SQL.
@@ -113,15 +115,6 @@ def insert_document_topics(doc_id: int, topic_names: list, conn=None):
     finally:
         if should_close and conn:
             conn.close()
-
-import os
-import psycopg2
-
-def get_postgres_conn():
-    url = os.getenv("POSTGRES_URL")
-    if url:
-        return psycopg2.connect(url)
-    return None
 
 def get_document_owner(doc_id: int, conn=None):
     """Return the user_id that owns a document, or None if it does not exist."""
@@ -361,19 +354,16 @@ def delete_document(doc_id: int, user_id: int = None, conn=None) -> bool:
             conn.close()
 
 def delete_chunk_vectors(doc_id: int, conn=None):
-    """Delete vectors for the document from pgvector chunk_vectors table."""
-    should_close = False
-    if conn is None:
-        conn = get_postgres_conn()
-        should_close = True
+    """Delete vectors for the document from pgvector chunk_vectors table.
 
-    if not conn:
-        return
-
-    try:
-        with conn.cursor() as cursor:
+    Uses ``conn`` if given, otherwise a pooled connection (slice-29).
+    """
+    def delete_vectors(pg_conn):
+        with pg_conn.cursor() as cursor:
             cursor.execute("DELETE FROM chunk_vectors WHERE doc_id = %s", (doc_id,))
-        conn.commit()
-    finally:
-        if should_close and conn:
-            conn.close()
+        pg_conn.commit()
+
+    if conn is not None:
+        delete_vectors(conn)
+    else:
+        run_pg(delete_vectors)

@@ -144,10 +144,10 @@ def process_document(doc_id: int, minio_key: str):
         from backend.modules.documents.db import (
             get_chunks_for_document,
             delete_chunks,
-            get_postgres_conn,
             get_document_owner,
         )
         from backend.modules.documents.embed import get_embeddings
+        from backend.modules.postgres import run_pg
         import json
 
         db_chunks = get_chunks_for_document(doc_id)
@@ -162,29 +162,23 @@ def process_document(doc_id: int, minio_key: str):
         # Compute embeddings
         embeddings = get_embeddings(chunk_texts)
 
-        pg_conn = get_postgres_conn()
-        if not pg_conn:
-            raise Exception("Could not connect to Postgres")
+        insert_query = "INSERT INTO chunk_vectors (chunk_id, doc_id, embedding) VALUES (%s, %s, %s)"
+        data = [(c_id, doc_id, json.dumps(emb)) for c_id, emb in zip(chunk_ids, embeddings)]
 
-        try:
-            with pg_conn.cursor() as cursor:
-                insert_query = "INSERT INTO chunk_vectors (chunk_id, doc_id, embedding) VALUES (%s, %s, %s)"
-                data = [(c_id, doc_id, json.dumps(emb)) for c_id, emb in zip(chunk_ids, embeddings)]
-                cursor.executemany(insert_query, data)
-            pg_conn.commit()
+        def insert_vectors(pg_conn):
+            # One transaction on the pooled connection: every vector or none.
+            with pg_conn:
+                with pg_conn.cursor() as cursor:
+                    cursor.executemany(insert_query, data)
 
-            # Everything succeeded — the document is now searchable, so drop the
-            # owner's cached (possibly empty) search results that were computed
-            # before these vectors existed. Otherwise a search run between upload
-            # and this point would stay pinned for the full cache TTL.
-            update_document_status(doc_id, 'ready')
-            _invalidate_owner_cache(doc_id)
+        run_pg(insert_vectors)
 
-        except Exception as e:
-            pg_conn.rollback()
-            raise e
-        finally:
-            pg_conn.close()
+        # Everything succeeded — the document is now searchable, so drop the
+        # owner's cached (possibly empty) search results that were computed
+        # before these vectors existed. Otherwise a search run between upload
+        # and this point would stay pinned for the full cache TTL.
+        update_document_status(doc_id, 'ready')
+        _invalidate_owner_cache(doc_id)
 
     except Exception as e:
         logger.error(f"Failed to embed chunks for doc {doc_id}: {e}")

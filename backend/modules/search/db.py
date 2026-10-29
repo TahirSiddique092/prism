@@ -4,21 +4,13 @@ Executes explicit SQL queries across MySQL (metadata, documents, chunks)
 and PostgreSQL pgvector (vector similarity search).
 """
 import json
-import os
-import psycopg2
 
 try:
     from backend.modules.auth.db import get_db_connection
+    from backend.modules.postgres import run_pg
 except ImportError:
     from modules.auth.db import get_db_connection
-
-
-def get_postgres_conn():
-    """Return a new connection to PostgreSQL."""
-    url = os.getenv("POSTGRES_URL")
-    if url:
-        return psycopg2.connect(url)
-    return None
+    from modules.postgres import run_pg
 
 
 def get_user_document_ids(user_id: int, conn=None) -> list[int]:
@@ -50,22 +42,15 @@ def search_chunk_vectors(
     
     Operator <=> returns cosine distance (lower = more similar).
     Returns list of dicts: [{ chunk_id, doc_id, score }].
+    Uses ``pg_conn`` if given, otherwise a pooled connection (slice-29).
     """
     if not doc_ids:
         return []
 
-    should_close = False
-    if pg_conn is None:
-        pg_conn = get_postgres_conn()
-        should_close = True
+    vec_str = json.dumps(query_embedding)
 
-    if not pg_conn:
-        raise RuntimeError("PostgreSQL connection unavailable")
-
-    try:
-        vec_str = json.dumps(query_embedding)
-
-        with pg_conn.cursor() as cursor:
+    def query_vectors(conn):
+        with conn.cursor() as cursor:
             query = """
                 SELECT chunk_id, doc_id, (embedding <=> %s::vector) AS score
                 FROM chunk_vectors
@@ -74,19 +59,18 @@ def search_chunk_vectors(
                 LIMIT %s
             """
             cursor.execute(query, (vec_str, doc_ids, limit))
-            rows = cursor.fetchall()
+            return cursor.fetchall()
 
-        results = []
-        for row in rows:
-            results.append({
-                "chunk_id": int(row[0]),
-                "doc_id": int(row[1]),
-                "score": float(row[2]),
-            })
-        return results
-    finally:
-        if should_close and pg_conn:
-            pg_conn.close()
+    rows = query_vectors(pg_conn) if pg_conn is not None else run_pg(query_vectors)
+
+    results = []
+    for row in rows:
+        results.append({
+            "chunk_id": int(row[0]),
+            "doc_id": int(row[1]),
+            "score": float(row[2]),
+        })
+    return results
 
 
 def get_chunks_metadata(chunk_ids: list[int], conn=None) -> dict[int, dict]:

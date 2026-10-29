@@ -13,8 +13,8 @@ Make PRISM dependable for everyday studying. Every store agrees with MySQL. The 
 - [ ]  `slice-26-pdf-viewer` — pdf.js viewer with full screen and open in new tab — **Unassigned**
 - [ ]  `slice-27-jump-to-passage` — Open a search result at its page, with the passage highlighted — **Unassigned**
 - [ ]  `slice-28-dashboard-status-retry` — Live processing status, retry failed documents — **Unassigned**
-- [ ]  `slice-29-search-cache-speed` — Reuse Redis and Postgres connections so cached searches are fast — **Unassigned**
-- [ ]  `slice-30-prism-favicon` — PRISM favicon instead of the Next.js default — **Unassigned**
+- [x]  `slice-29-search-cache-speed` — Reuse Redis and Postgres connections so cached searches are fast — **Unassigned**
+- [x]  `slice-30-prism-favicon` — PRISM favicon instead of the Next.js default — **Unassigned**
 
 Also shipped during this sprint, outside the slice plan: the hotfix in PR #39 (prepared statements for free-text MySQL queries, ADR-017).
 
