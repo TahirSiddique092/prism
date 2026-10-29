@@ -169,10 +169,9 @@ def search_chunks_fulltext(
         should_close = True
 
     try:
-        try:
-            cursor = conn.cursor(dictionary=True)
-        except TypeError:
-            cursor = conn.cursor()
+        # Prepared statement: the user's query is sent apart from the SQL
+        # (ADR-017). Rows come back as tuples; the mapping below handles both.
+        cursor = conn.cursor(prepared=True)
 
         query_sql = """
             SELECT 
@@ -225,7 +224,8 @@ def insert_search_log(user_id: int, query_text: str, conn=None) -> int:
         should_close = True
 
     try:
-        cursor = conn.cursor()
+        # Prepared statement: the user's query is sent apart from the SQL (ADR-017).
+        cursor = conn.cursor(prepared=True)
         query = "INSERT INTO search_log (user_id, query_text) VALUES (%s, %s)"
         cursor.execute(query, (user_id, query_text))
         if hasattr(conn, "commit"):
