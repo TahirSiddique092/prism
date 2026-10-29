@@ -155,7 +155,7 @@ The ranked results returned for each search.
 | `log_id` | INT | FK → `search_log`, `ON DELETE CASCADE` |
 | `chunk_id` | INT | FK → `chunks`, `ON DELETE CASCADE` |
 | `rank` | INT | 1 to 10 |
-| `similarity_score` | FLOAT, nullable | Cosine distance from vector search. `NULL` when the keyword (FULLTEXT) fallback produced the result. |
+| `similarity_score` | FLOAT, nullable | Cosine distance from vector search (lower is closer); the app shows it as similarity, 1 − distance. `NULL` when the keyword (FULLTEXT) fallback produced the result. |
 
 ### `deletion_audit`
 Audit trail written by a trigger whenever a document is deleted.
@@ -198,12 +198,13 @@ END;
 ```
 
 ### View — `top_documents`
-Ranks documents by how often their chunks appear in search results. The totals are computed when the view is queried, not stored.
+Ranks documents by how many searches they came up in. `search_count` counts each search once; `appearance_count` counts the document's passages across those searches (up to 10 per search). The totals are computed when the view is queried, not stored.
 ```sql
 CREATE OR REPLACE VIEW top_documents AS
 SELECT d.user_id, d.doc_id, d.title,
-       COUNT(sr.result_id)      AS appearance_count,
-       AVG(sr.similarity_score) AS avg_score
+       COUNT(sr.result_id)       AS appearance_count,
+       AVG(sr.similarity_score)  AS avg_score,
+       COUNT(DISTINCT sr.log_id) AS search_count
 FROM search_results sr
 JOIN chunks c    ON sr.chunk_id = c.chunk_id
 JOIN documents d ON c.doc_id    = d.doc_id
@@ -289,12 +290,17 @@ WITH searched_docs AS (
 SELECT doc_id, title, uploaded_at
 FROM documents
 WHERE user_id = %s
+  AND status = 'ready'
   AND doc_id NOT IN (SELECT doc_id FROM searched_docs);
 ```
 
 **Top documents** (analytics, view)
 ```sql
-SELECT * FROM top_documents WHERE user_id = %s ORDER BY appearance_count DESC LIMIT 10;
+SELECT doc_id, title, search_count, appearance_count, avg_score
+FROM top_documents
+WHERE user_id = %s
+ORDER BY search_count DESC, appearance_count DESC
+LIMIT 10;
 ```
 
 ---

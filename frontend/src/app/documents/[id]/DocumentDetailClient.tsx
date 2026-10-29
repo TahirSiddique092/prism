@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import LocalTime from "@/components/LocalTime";
 
 export interface DocumentDetail {
   doc_id: number;
@@ -21,21 +22,6 @@ export interface RelatedDocument {
 interface DocumentDetailClientProps {
   detail: DocumentDetail;
   related: RelatedDocument[];
-}
-
-function formatUploadDate(isoString: string | null | undefined): string {
-  if (!isoString) return "—";
-  try {
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return String(isoString);
-    return d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return String(isoString);
-  }
 }
 
 function StatusBadge({ status }: { status: DocumentDetail["status"] }) {
@@ -162,7 +148,7 @@ export default function DocumentDetailClient({
             <div className="detail-meta-item">
               <span className="detail-meta-label">Uploaded</span>
               <span className="detail-meta-value" data-testid="detail-uploaded-at">
-                {formatUploadDate(detail.uploaded_at)}
+                <LocalTime iso={detail.uploaded_at} />
               </span>
             </div>
             <div className="detail-meta-item">

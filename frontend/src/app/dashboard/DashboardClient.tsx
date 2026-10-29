@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import LocalTime from "@/components/LocalTime";
 
 export interface DocumentItem {
   doc_id: number;
@@ -17,21 +18,6 @@ interface DashboardClientProps {
 }
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
-
-function formatUploadDate(isoString: string | null | undefined): string {
-  if (!isoString) return "Just now";
-  try {
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return String(isoString);
-    return d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return String(isoString);
-  }
-}
 
 export default function DashboardClient({ initialDocuments = [] }: DashboardClientProps) {
   const router = useRouter();
@@ -467,7 +453,7 @@ export default function DashboardClient({ initialDocuments = [] }: DashboardClie
                     style={{ fontSize: "0.75rem", color: "var(--color-text-muted)" }}
                     data-testid={`doc-date-${doc.doc_id}`}
                   >
-                    {formatUploadDate(doc.uploaded_at)}
+                    <LocalTime iso={doc.uploaded_at} empty="Just now" />
                   </td>
                   <td>
                     <span

@@ -104,6 +104,28 @@ describe("Slice 18 — Frontend Search page & API handler", () => {
       assert.strictEqual(data.results[0].doc_id, 7);
     });
 
+    it("forwards log: false for restored results and log: true otherwise (slice-25)", async () => {
+      const forwarded: Array<Record<string, unknown>> = [];
+      globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+        forwarded.push(JSON.parse(String(init?.body ?? "{}")));
+        return new Response(JSON.stringify({ results: [], cached: false }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }) as typeof fetch;
+
+      for (const body of [{ query: "joins", log: false }, { query: "joins", log: true }, { query: "joins" }]) {
+        const req = new NextRequest("http://localhost:3000/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", cookie: `${AUTH_COOKIE}=${mockToken}` },
+          body: JSON.stringify(body),
+        });
+        assert.strictEqual((await search(req)).status, 200);
+      }
+
+      assert.deepStrictEqual(forwarded.map((b) => b.log), [false, true, true]);
+    });
+
     it("returns 502 when the backend is unreachable", async () => {
       globalThis.fetch = (async () => {
         throw new Error("ECONNREFUSED");

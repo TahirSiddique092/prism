@@ -64,12 +64,14 @@ flowchart LR
 | POST | `/api/documents/upload` | `form-data: file, topics[]` | `{ doc_id, minio_key }` |
 | DELETE | `/api/documents/:doc_id` | — | `{ message }` |
 | GET | `/api/documents/:doc_id/related` | — | `[{ doc_id, title, shared_topics }]` |
-| POST | `/api/search` | `{ query }` | `{ results: [{ chunk_id, doc_id, doc_title, snippet, score }], cached }` |
+| POST | `/api/search` | `{ query, log? }` (`log: false` = don't record in search history) | `{ results: [{ chunk_id, doc_id, doc_title, snippet, score }], cached }` |
 | GET | `/api/analytics/history` | — | `[{ query_text, search_count, query_rank, last_searched, total_searches }]` |
 | GET | `/api/analytics/unsearched` | — | `[{ doc_id, title, uploaded_at }]` |
-| GET | `/api/analytics/top-documents` | — | `[{ doc_id, title, appearance_count, avg_score }]` |
+| GET | `/api/analytics/top-documents` | — | `[{ doc_id, title, search_count, appearance_count, avg_score }]` |
 
 All protected routes require `Authorization: Bearer <token>` header.
+
+Timestamps (`uploaded_at`, `last_searched`) are UTC in ISO 8601 with a `Z` suffix, e.g. `2026-10-29T16:00:09Z`; the frontend shows them in the viewer's time zone. `score` is the cosine distance (lower is closer), or `null` for FULLTEXT results; the frontend shows it as similarity, 1 − distance.
 
 ---
 

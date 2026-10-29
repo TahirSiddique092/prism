@@ -291,13 +291,13 @@ def test_raw_sql_search_history_contract():
     assert history[0]["query_text"] == "postgresql pgvector"
     assert history[0]["search_count"] == 8
     assert history[0]["query_rank"] == 1
-    assert history[0]["last_searched"] == "2026-10-10T14:20:00"
+    assert history[0]["last_searched"] == "2026-10-10T14:20:00Z"  # UTC, marked with Z (slice-25)
     assert history[0]["total_searches"] == 12
 
     assert history[1]["query_text"] == "mysql transactions"
     assert history[1]["search_count"] == 4
     assert history[1]["query_rank"] == 2
-    assert history[1]["last_searched"] == "2026-10-09T10:15:00"
+    assert history[1]["last_searched"] == "2026-10-09T10:15:00Z"  # UTC, marked with Z (slice-25)
     assert history[1]["total_searches"] == 12
 
 
@@ -324,7 +324,7 @@ def test_raw_sql_search_history_tuple_cursor_fallback():
     assert history[0]["query_text"] == "acid properties"
     assert history[0]["search_count"] == 3
     assert history[0]["query_rank"] == 1
-    assert history[0]["last_searched"] == "2026-10-08T16:45:00"
+    assert history[0]["last_searched"] == "2026-10-08T16:45:00Z"  # UTC, marked with Z (slice-25)
     assert history[0]["total_searches"] == 3
 
 

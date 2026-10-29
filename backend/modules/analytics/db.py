@@ -9,8 +9,10 @@ import logging
 
 try:
     from backend.modules.auth.db import get_db_connection
+    from backend.modules.timeutils import to_utc_iso
 except ImportError:
     from modules.auth.db import get_db_connection
+    from modules.timeutils import to_utc_iso
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,8 @@ GROUP BY query_text
 ORDER BY query_rank;
 """
 
-# Unsearched documents using Common Table Expression (CTE) (Slice 15)
+# Unsearched documents using Common Table Expression (CTE) (Slice 15).
+# Only 'ready' documents: ones still processing or failed can't appear in results (slice-25).
 UNSEARCHED_DOCS_QUERY = """
 WITH searched_docs AS (
     SELECT DISTINCT d.doc_id
@@ -41,12 +44,18 @@ WITH searched_docs AS (
 SELECT doc_id, title, uploaded_at
 FROM documents
 WHERE user_id = %s
+  AND status = 'ready'
   AND doc_id NOT IN (SELECT doc_id FROM searched_docs);
 """
 
-# Top documents queried from top_documents SQL view (Slice 15)
+# Top documents queried from top_documents SQL view (Slice 15). Ranked by the
+# number of searches a document appeared in, then by passage hits (slice-25).
 TOP_DOCUMENTS_QUERY = """
-SELECT * FROM top_documents WHERE user_id = %s ORDER BY appearance_count DESC LIMIT 10;
+SELECT doc_id, title, search_count, appearance_count, avg_score
+FROM top_documents
+WHERE user_id = %s
+ORDER BY search_count DESC, appearance_count DESC
+LIMIT 10;
 """
 
 
@@ -92,16 +101,11 @@ def get_search_history(user_id: int, conn=None) -> list[dict]:
                     row[4],
                 )
 
-            if hasattr(last_searched_val, "isoformat"):
-                last_searched_str = last_searched_val.isoformat()
-            else:
-                last_searched_str = str(last_searched_val) if last_searched_val is not None else None
-
             results.append({
                 "query_text": str(query_text),
                 "search_count": int(search_count),
                 "query_rank": int(query_rank),
-                "last_searched": last_searched_str,
+                "last_searched": to_utc_iso(last_searched_val),
                 "total_searches": int(total_searches),
             })
 
@@ -143,15 +147,10 @@ def get_unsearched_documents(user_id: int, conn=None) -> list[dict]:
             else:
                 doc_id, title, uploaded_at_val = row[0], row[1], row[2]
 
-            if hasattr(uploaded_at_val, "isoformat"):
-                uploaded_at_str = uploaded_at_val.isoformat()
-            else:
-                uploaded_at_str = str(uploaded_at_val) if uploaded_at_val is not None else None
-
             results.append({
                 "doc_id": int(doc_id),
                 "title": str(title),
-                "uploaded_at": uploaded_at_str,
+                "uploaded_at": to_utc_iso(uploaded_at_val),
             })
 
         return results
@@ -164,7 +163,9 @@ def get_top_documents(user_id: int, conn=None) -> list[dict]:
     """Retrieve documents ranked by search appearances via top_documents view (Slice 15).
 
     Acceptance criteria:
-    - /top-documents returns documents ordered by appearance_count descending (LIMIT 10)
+    - /top-documents returns documents ordered by search_count, then appearance_count,
+      descending (LIMIT 10). search_count is the number of searches the document
+      appeared in; appearance_count the number of its passages returned (slice-25)
     - Returns an empty list when no data exists
     - Never returns another user's documents
     """
@@ -188,18 +189,17 @@ def get_top_documents(user_id: int, conn=None) -> list[dict]:
             if isinstance(row, dict):
                 doc_id = row["doc_id"]
                 title = row["title"]
+                search_count = row["search_count"]
                 appearance_count = row["appearance_count"]
                 avg_score_val = row.get("avg_score")
             else:
-                # View columns: (user_id, doc_id, title, appearance_count, avg_score)
-                if len(row) >= 5:
-                    doc_id, title, appearance_count, avg_score_val = row[1], row[2], row[3], row[4]
-                else:
-                    doc_id, title, appearance_count, avg_score_val = row[0], row[1], row[2], row[3]
+                # Columns as selected: (doc_id, title, search_count, appearance_count, avg_score)
+                doc_id, title, search_count, appearance_count, avg_score_val = row[:5]
 
             results.append({
                 "doc_id": int(doc_id),
                 "title": str(title),
+                "search_count": int(search_count),
                 "appearance_count": int(appearance_count),
                 "avg_score": float(avg_score_val) if avg_score_val is not None else None,
             })

@@ -7,6 +7,7 @@ import {
   sortTopDocsByCount,
   type TopDocumentItem,
 } from "@/lib/analytics";
+import { formatSimilarity, SIMILARITY_TOOLTIP } from "@/lib/scores";
 
 export default function TopDocumentsClient() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function TopDocumentsClient() {
         const data = await res.json();
         if (!isCancelled) {
           if (Array.isArray(data)) {
-            // Guarantee appearance count descending
+            // Most searches first, then most passages
             setItems(sortTopDocsByCount(data));
           } else {
             setItems([]);
@@ -63,7 +64,7 @@ export default function TopDocumentsClient() {
         <div>
           <h1 className="page-title">Top Documents</h1>
           <p className="page-subtitle">
-            Most frequently surfaced documents across search results
+            Documents that came up in the most searches
           </p>
         </div>
       </div>
@@ -162,8 +163,9 @@ export default function TopDocumentsClient() {
               <tr>
                 <th style={{ width: "80px" }}>Rank</th>
                 <th>Document Title</th>
-                <th style={{ width: "190px", textAlign: "right" }}>Appearance Count</th>
-                <th style={{ width: "210px", textAlign: "right" }}>Avg. Similarity Score</th>
+                <th style={{ width: "170px", textAlign: "right" }}>Searches</th>
+                <th style={{ width: "130px", textAlign: "right" }}>Passages</th>
+                <th style={{ width: "190px", textAlign: "right" }}>Avg. Similarity</th>
               </tr>
             </thead>
             <tbody>
@@ -192,14 +194,24 @@ export default function TopDocumentsClient() {
                     </div>
                   </td>
                   <td style={{ textAlign: "right", fontFamily: "var(--font-mono, monospace)" }}>
-                    <span className="count-pill">{doc.appearance_count} appearances</span>
+                    <span
+                      className="count-pill"
+                      title="Number of searches this document appeared in"
+                    >
+                      in {doc.search_count} {doc.search_count === 1 ? "search" : "searches"}
+                    </span>
+                  </td>
+                  <td
+                    style={{ textAlign: "right", fontFamily: "var(--font-mono, monospace)", color: "var(--color-text-muted)" }}
+                    title="Passages from this document returned across those searches (up to 10 per search)"
+                  >
+                    {doc.appearance_count}
                   </td>
                   <td style={{ textAlign: "right", fontFamily: "var(--font-mono, monospace)" }}>
-                    {doc.avg_score !== null && doc.avg_score !== undefined ? (
-                      // avg_score from the backend is average cosine DISTANCE
-                      // (lower = closer). Display it as a similarity (higher =
-                      // more relevant) so the column matches its "Similarity" label.
-                      <span className="result-score">{(1 - doc.avg_score).toFixed(4)}</span>
+                    {formatSimilarity(doc.avg_score) !== null ? (
+                      <span className="result-score" title={SIMILARITY_TOOLTIP}>
+                        {formatSimilarity(doc.avg_score)}
+                      </span>
                     ) : (
                       <span style={{ color: "var(--color-text-muted)" }}>—</span>
                     )}

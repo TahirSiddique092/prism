@@ -3,9 +3,11 @@
 try:
     from backend.modules.auth.db import get_db_connection
     from backend.modules.postgres import run_pg
+    from backend.modules.timeutils import to_utc_iso
 except ImportError:
     from modules.auth.db import get_db_connection
     from modules.postgres import run_pg
+    from modules.timeutils import to_utc_iso
 
 def insert_document(user_id: int, title: str, minio_key: str, conn=None) -> int:
     """Insert a new document record into MySQL using raw SQL.
@@ -244,15 +246,10 @@ def get_user_documents(user_id: int, conn=None) -> list[dict]:
                     row[4],
                 )
 
-            if hasattr(uploaded_at_val, "isoformat"):
-                uploaded_at_str = uploaded_at_val.isoformat()
-            else:
-                uploaded_at_str = str(uploaded_at_val) if uploaded_at_val is not None else None
-
             results.append({
                 "doc_id": doc_id,
                 "title": title,
-                "uploaded_at": uploaded_at_str,
+                "uploaded_at": to_utc_iso(uploaded_at_val),
                 "status": status_val or "ready",
                 "chunk_count": int(chunk_count) if chunk_count is not None else 0,
             })
