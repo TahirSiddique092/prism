@@ -20,7 +20,7 @@ Replace the embedded `<iframe>` preview on the document page with a pdf.js viewe
 
 ### 2. Full screen and open in new tab
 - **Full screen:** toggles the Fullscreen API on the viewer container, toolbar included. Esc or the button exits.
-- **Open in new tab:** fetches a fresh URL from `/api/documents/:id/url` and opens it in a new tab with `noopener`. Pre-signed URLs expire after an hour, so it does not reuse the URL fetched when the page loaded.
+- **Open in new tab:** a plain link (`target="_blank"`, `noopener`) to a new Next route, `/api/documents/:id/open`. The route fetches a fresh pre-signed URL from Flask's `/url` endpoint and redirects to it. Pre-signed URLs expire after an hour, so it never reuses the URL fetched when the page loaded, and as a plain link it can't be stopped by a popup blocker.
 - If the PDF fails to load, the error state shows "Open in new tab" as a fallback.
 
 ### 3. Layout
