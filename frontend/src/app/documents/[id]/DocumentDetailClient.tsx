@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import LocalTime from "@/components/LocalTime";
+import PdfViewer from "@/components/PdfViewer";
 
 export interface DocumentDetail {
   doc_id: number;
@@ -194,7 +195,7 @@ export default function DocumentDetailClient({
         </div>
       </div>
 
-      {/* Two-column: PDF viewer + related documents */}
+      {/* PDF viewer (full width), related documents below */}
       <div className="detail-layout">
         {/* Inline PDF viewer */}
         <div className="card detail-viewer-card">
@@ -203,7 +204,7 @@ export default function DocumentDetailClient({
               Document Preview
             </h2>
             <span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)" }}>
-              Served from MinIO
+              Served from object storage
             </span>
           </div>
           <div className="detail-viewer-body">
@@ -234,18 +235,26 @@ export default function DocumentDetailClient({
                   <line x1="12" y1="8" x2="12" y2="12" />
                   <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
-                <p style={{ color: "var(--color-text-muted)", fontSize: "0.875rem" }}>
+                <p style={{ color: "var(--color-text-muted)", fontSize: "0.875rem", marginBottom: 12 }}>
                   {pdfError}
                 </p>
+                <a
+                  className="btn btn-secondary btn-sm"
+                  href={`/api/documents/${detail.doc_id}/open`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open in new tab
+                </a>
               </div>
             )}
 
             {!pdfLoading && !pdfError && viewUrl && (
-              <iframe
-                src={viewUrl}
-                className="detail-pdf-frame"
-                title={`PDF preview of ${detail.title}`}
-                data-testid="pdf-frame"
+              <PdfViewer
+                key={viewUrl}
+                url={viewUrl}
+                title={detail.title}
+                openHref={`/api/documents/${detail.doc_id}/open`}
               />
             )}
           </div>
