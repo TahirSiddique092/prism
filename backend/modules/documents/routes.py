@@ -20,6 +20,9 @@ try:
         insert_document_topics,
         get_existing_doc_ids,
         get_chunk,
+        delete_chunks,
+        update_document_status,
+        claim_for_retry,
     )
     from backend.modules.cache import invalidate_user_cache
     from backend.modules.timeutils import to_utc_iso
@@ -46,6 +49,9 @@ except ImportError:
         insert_document_topics,
         get_existing_doc_ids,
         get_chunk,
+        delete_chunks,
+        update_document_status,
+        claim_for_retry,
     )
     from modules.cache import invalidate_user_cache
     from modules.timeutils import to_utc_iso
@@ -266,6 +272,58 @@ def delete_document_route(doc_id: int):
         logger.error(f"Error deleting doc {doc_id}: {e}")
         return jsonify({"error": f"Failed to delete document: {str(e)}"}), 500
 
+def start_processing(doc_id: int, minio_key: str) -> None:
+    """Run the chunking / embedding worker for a document in a background thread."""
+    from backend.modules.documents.worker import process_document
+    import threading
+    threading.Thread(target=process_document, args=(doc_id, minio_key)).start()
+
+
+@documents_bp.route("/<int:doc_id>/retry", methods=["POST"])
+def retry_document(doc_id: int):
+    """Process a failed document again (slice-28).
+
+    Only the owner can retry, and only a document in 'error' (409 otherwise).
+    Its old chunks and vectors are removed first so the new run starts clean,
+    then the worker runs again in the background.
+    Response 202: { doc_id, status: "processing" }
+    """
+    user_id = g.user_id
+    try:
+        doc = get_document_by_id(doc_id, user_id=user_id)
+        if not doc:
+            return jsonify({"error": "Document not found"}), 404
+        if doc.get("status") != "error" or not claim_for_retry(doc_id, user_id):
+            return jsonify({"error": "Only a document that failed processing can be retried"}), 409
+
+        # Clear what a failed run may have left. Vectors first: deleting the
+        # chunks also removes their search_results rows (cascade).
+        try:
+            delete_chunk_vectors(doc_id)
+            delete_chunks(doc_id)
+        except Exception as e:
+            logger.error(f"Failed to clear old data before retrying doc {doc_id}: {e}")
+            update_document_status(doc_id, "error")
+            return jsonify({"error": "Could not clear the document's earlier data. Try again."}), 500
+
+        try:
+            invalidate_user_cache(user_id)
+        except Exception as e:
+            logger.warning(f"Failed to invalidate cache for user {user_id}: {e}")
+
+        try:
+            start_processing(doc_id, doc["minio_key"])
+        except Exception as e:
+            logger.error(f"Failed to start processing for doc {doc_id}: {e}")
+            update_document_status(doc_id, "error")
+            return jsonify({"error": "Could not start processing. Try again."}), 500
+
+        return jsonify({"doc_id": doc_id, "status": "processing"}), 202
+    except Exception as e:
+        logger.error(f"Error retrying doc {doc_id}: {e}")
+        return jsonify({"error": "Failed to retry document"}), 500
+
+
 # Browsers/clients sometimes send a generic content type for a genuine PDF;
 # the .pdf extension + accurate byte-size check below remain authoritative.
 ALLOWED_PDF_MIMETYPES = {
@@ -367,9 +425,7 @@ def upload_document():
 
     # 7. Trigger background chunking task
     try:
-        from backend.modules.documents.worker import process_document
-        import threading
-        threading.Thread(target=process_document, args=(doc_id, minio_key)).start()
+        start_processing(doc_id, minio_key)
     except Exception as e:
         # We don't fail the upload if background task fails to start, but we should log it
         print(f"Warning: Failed to start background task for doc {doc_id}: {e}")

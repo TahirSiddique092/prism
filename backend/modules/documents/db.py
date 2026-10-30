@@ -48,6 +48,60 @@ def update_document_status(doc_id: int, status: str, conn=None):
         if should_close and conn:
             conn.close()
 
+def claim_for_retry(doc_id: int, user_id: int, conn=None) -> bool:
+    """Move one of the user's failed documents back to 'processing' (slice-28).
+
+    A single conditional UPDATE, so two retries at the same time can't both
+    start processing: only the first one changes the row.
+    Returns True if the document was 'error' and is now 'processing'.
+    """
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        query = (
+            "UPDATE documents SET status = 'processing' "
+            "WHERE doc_id = %s AND user_id = %s AND status = 'error'"
+        )
+        cursor.execute(query, (doc_id, user_id))
+        conn.commit()
+        claimed = cursor.rowcount == 1
+        cursor.close()
+        return claimed
+    finally:
+        if should_close and conn:
+            conn.close()
+
+
+def mark_interrupted_processing_failed(conn=None) -> int:
+    """Set every document still 'processing' to 'error' (slice-28).
+
+    Called when the backend starts. Processing only runs in background threads
+    of the backend process, so at start-up nothing can still be in progress: a
+    'processing' document was interrupted by a restart. As 'error' it can be
+    retried. Assumes a single backend process (ADR-015).
+    Returns the number of documents changed.
+    """
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE documents SET status = 'error' WHERE status = 'processing'")
+        conn.commit()
+        changed = cursor.rowcount
+        cursor.close()
+        return changed
+    finally:
+        if should_close and conn:
+            conn.close()
+
+
 # Rows per multi-row INSERT in insert_chunks. 5 placeholders per row keeps each
 # statement far below MySQL's 65,535 prepared-statement placeholder limit.
 CHUNK_INSERT_BATCH = 500
