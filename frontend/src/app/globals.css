@@ -1183,7 +1183,7 @@ dialog.prism-dialog::backdrop {
 }
 
 /* pdf.js text layer: transparent, selectable text laid over the canvas.
-   Rules taken from pdfjs-dist/web/pdf_viewer.css (5.7). */
+   Rules taken from pdfjs-dist/web/pdf_viewer.css (6.4). */
 .textLayer {
   position: absolute;
   text-align: initial;
@@ -1191,6 +1191,8 @@ dialog.prism-dialog::backdrop {
   overflow: clip;
   opacity: 1;
   line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
   text-size-adjust: none;
   forced-color-adjust: none;
   transform-origin: 0 0;
@@ -1207,6 +1209,7 @@ dialog.prism-dialog::backdrop {
   white-space: pre;
   cursor: text;
   transform-origin: 0% 0%;
+  user-select: text;
 }
 
 .textLayer > :not(.markedContent),
@@ -1230,6 +1233,7 @@ dialog.prism-dialog::backdrop {
 
 .textLayer ::selection {
   background: rgba(59, 130, 246, 0.35);
+  color: transparent;
 }
 
 .textLayer br::selection {
