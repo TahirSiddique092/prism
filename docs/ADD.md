@@ -44,7 +44,7 @@ flowchart LR
 
 - `auth` — register, login, logout. Issues and verifies JWTs. Handles password hashing with bcrypt. Owns the `users` table.
 - `documents` — receives PDF upload from client, stores the file in MinIO, parses text with PyMuPDF, splits into sentence-boundary-aware chunks, embeds each chunk via the embedding model, writes document metadata to MySQL and chunk vectors to pgvector. Also handles document deletion and listing.
-- `search` — accepts a plain-English query, embeds it, runs cosine similarity search on pgvector. If the best match distance exceeds 0.75, falls back to MySQL FULLTEXT search. Logs every search to `search_log` and writes top results to `search_results`. Calls `cache` before hitting pgvector.
+- `search` — accepts a plain-English query, embeds it, runs cosine similarity search on pgvector. If the best match distance exceeds 0.75, falls back to MySQL FULLTEXT search; otherwise drops matches beyond 0.60 distance, keeping the best (ADR-020). Logs every search to `search_log` and writes top results to `search_results`. Calls `cache` before hitting pgvector.
 - `cache` — Redis read/write/invalidate layer. Key format: `search:{user_id}:{md5(query)}`. TTL: 3600s. Invalidates a user's cache on new document upload. Used by `search`; reusable across other modules.
 - `graph` — on document upload, writes `(Document)-[:ABOUT]->(Topic)` nodes and relationships to Neo4j using manually assigned topic tags. Exposes a query to find related documents by shared topics.
 - `analytics` — read-only reporting module. Serves search history ranked with window functions, unsearched documents via CTE, and top documents via the `top_documents` view. No writes.
@@ -97,4 +97,5 @@ Full schema, diagrams and data flows: [relational-schema.md](data/relational-sch
 - **Security:** All API routes are JWT-protected except `/register` and `/login`. Flask CORS restricted to the frontend origin (`FRONTEND_URL`) only. Passwords hashed with bcrypt, never stored plain.
 - **Chunking:** Sentence-boundary aware, targeting ~200 words per chunk with 1–2 sentence overlap. Implemented with `nltk.sent_tokenize`.
 - **Similarity threshold:** Cosine distance > 0.75 triggers FULLTEXT fallback. Hardcoded for v1, extractable to config later.
+- **Result cutoff:** Vector results with cosine distance > 0.60 are dropped, except the best match (ADR-020).
 - **No offline support, no mobile, no multi-tenancy** — out of scope for v1.

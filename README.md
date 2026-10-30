@@ -61,8 +61,9 @@ datastores. Database migrations run automatically on backend startup.
    (~200 words, sentence overlap) into MySQL; each chunk is embedded with
    `all-MiniLM-L6-v2` into pgvector; topics are written to a Neo4j graph.
 2. **Search** → your query is embedded and matched by cosine distance in
-   pgvector; if nothing is close enough (distance > 0.75) it falls back to MySQL
-   FULLTEXT; results are cached in Redis.
+   pgvector; weak matches (distance > 0.60) are left out, and if nothing is
+   close enough (distance > 0.75) it falls back to MySQL FULLTEXT; results are
+   cached in Redis.
 3. **Explore** → view a document with its topics, related documents (via Neo4j),
    an inline PDF viewer, and analytics on what you've searched.
 
