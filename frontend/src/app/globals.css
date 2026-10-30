@@ -1161,6 +1161,27 @@ dialog.prism-dialog::backdrop {
   font-size: 0.875rem;
 }
 
+/* Search result passage (slice-27): a bar above the viewer, and the
+   passage's lines marked in the text layer. Multiply keeps the text readable. */
+.passage-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(250, 204, 21, 0.25);
+  background: rgba(250, 204, 21, 0.08);
+  color: #fde68a;
+  font-size: 0.8125rem;
+}
+
+.textLayer .pdf-passage {
+  background: rgba(250, 204, 21, 0.45);
+  mix-blend-mode: multiply;
+  border-radius: 2px;
+}
+
 /* pdf.js text layer: transparent, selectable text laid over the canvas.
    Rules taken from pdfjs-dist/web/pdf_viewer.css (5.7). */
 .textLayer {

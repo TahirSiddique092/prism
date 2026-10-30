@@ -20,7 +20,7 @@ def search():
     """POST /api/search
     
     Request body: { "query": "plain English query", "log": true|false (optional) }
-    Response: { "results": [{ chunk_id, doc_id, doc_title, snippet, score }],
+    Response: { "results": [{ chunk_id, doc_id, doc_title, snippet, score, page }],
                 "cached": true|false }
 
     "log": false runs the search without recording it in search_log /

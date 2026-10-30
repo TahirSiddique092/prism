@@ -151,7 +151,7 @@ MATCH (t:Topic) WHERE NOT (t)<-[:ABOUT]-() DELETE t
 |---|---|
 | Key | `search:{user_id}:{md5(normalized query)}` |
 | Normalisation | Lowercase, trim, and collapse repeated spaces, so "Joins  in SQL" and "joins in sql" share one key |
-| Value | JSON array of results: `[{ chunk_id, doc_id, doc_title, snippet, score }]` |
+| Value | JSON array of results: `[{ chunk_id, doc_id, doc_title, snippet, score, page }]` |
 | Expiry (TTL) | 3600 s (1 hour) |
 | Cleared when | The user uploads a document · a document finishes processing · the user deletes a document |
 | How it is cleared | `SCAN` for keys matching `search:{user_id}:*`, then `DEL` (`SCAN` does not block Redis; see ADR-001-redis-cache) |

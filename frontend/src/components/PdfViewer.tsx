@@ -2,6 +2,7 @@
 
 import {
   memo,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -26,6 +27,7 @@ import {
   stepZoom,
   type PageSize,
 } from "@/lib/pdfViewer";
+import { findPassageItems, pagePosition, type PassageHighlight } from "@/lib/passage";
 
 type PdfJs = typeof import("pdfjs-dist");
 
@@ -53,6 +55,12 @@ interface PdfViewerProps {
   title: string;
   /** Same-origin link that opens a fresh copy of the PDF in a new tab. */
   openHref: string;
+  /** Page to open at (slice-27). Read once, when the document loads. */
+  initialPage?: number | null;
+  /** Passage to highlight in the text layer (slice-27). */
+  highlight?: PassageHighlight | null;
+  /** Called once per highlight: whether the passage was found on its first page. */
+  onHighlightResult?: (found: boolean) => void;
 }
 
 interface ViewState {
@@ -65,15 +73,31 @@ interface ViewState {
  * Document viewer built on pdf.js (slice-26): continuous scrolling with a
  * text layer (selectable text), page navigation, zoom, fit to width, full
  * screen, and open in a new tab. Only the pages in view (plus one either
- * side) are drawn, so long PDFs stay light.
+ * side) are drawn, so long PDFs stay light. It can open at a given page and
+ * highlight a search result's passage (slice-27).
  */
-export default function PdfViewer({ url, title, openHref }: PdfViewerProps) {
+export default function PdfViewer({
+  url,
+  title,
+  openHref,
+  initialPage = null,
+  highlight = null,
+  onHighlightResult,
+}: PdfViewerProps) {
   const viewerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
-  // Page to keep in view after the scale changes (zoom, fit, resize).
+  // Page to keep in view after the scale changes (zoom, fit, resize), or to
+  // open at once the document has loaded.
   const pendingPageRef = useRef<number | null>(null);
   const currentPageRef = useRef(1);
+  const loadedRef = useRef(false);
+  // Latest props for callbacks that must stay stable across renders.
+  const initialPageRef = useRef(initialPage);
+  const highlightRef = useRef(highlight);
+  const onHighlightResultRef = useRef(onHighlightResult);
+  // Whether the current highlight has been reported and scrolled to.
+  const highlightHandledRef = useRef(false);
 
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [sizes, setSizes] = useState<PageSize[]>([]);
@@ -106,6 +130,8 @@ export default function PdfViewer({ url, title, openHref }: PdfViewerProps) {
           Array.from({ length: doc.numPages }, (_, i) => doc.getPage(i + 1))
         );
         if (cancelled) return;
+        loadedRef.current = true;
+        pendingPageRef.current = initialPageRef.current ?? 1;
         setSizes(
           pages.map((page) => {
             const { width, height } = page.getViewport({ scale: 1 });
@@ -129,7 +155,7 @@ export default function PdfViewer({ url, title, openHref }: PdfViewerProps) {
     const el = scrollRef.current;
     if (!el) return;
     const observer = new ResizeObserver(() => {
-      pendingPageRef.current = currentPageRef.current;
+      if (loadedRef.current) pendingPageRef.current = currentPageRef.current;
       setView({ top: el.scrollTop, width: el.clientWidth, height: el.clientHeight });
     });
     observer.observe(el);
@@ -139,6 +165,30 @@ export default function PdfViewer({ url, title, openHref }: PdfViewerProps) {
   useEffect(() => {
     currentPageRef.current = currentPage;
   }, [currentPage]);
+
+  useEffect(() => {
+    initialPageRef.current = initialPage;
+    onHighlightResultRef.current = onHighlightResult;
+  });
+
+  useEffect(() => {
+    highlightRef.current = highlight;
+    highlightHandledRef.current = false;
+  }, [highlight]);
+
+  // A page reports the passage it highlighted; on the passage's first page,
+  // report the result once and scroll the first highlighted line into view.
+  const handlePageHighlight = useCallback((pageNumber: number, first: HTMLElement | null) => {
+    const current = highlightRef.current;
+    if (!current || pageNumber !== current.pageStart || highlightHandledRef.current) return;
+    highlightHandledRef.current = true;
+    onHighlightResultRef.current?.(first !== null);
+    const el = scrollRef.current;
+    if (first && el) {
+      const top = first.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+      el.scrollTo({ top: Math.max(0, top - 48) });
+    }
+  }, []);
 
   // After the scale changes, scroll so the page that was in view still is.
   useLayoutEffect(() => {
@@ -391,6 +441,8 @@ export default function PdfViewer({ url, title, openHref }: PdfViewerProps) {
                 size={size}
                 scale={scale}
                 draw={i + 1 >= firstToRender && i + 1 <= lastToRender}
+                highlight={highlight}
+                onHighlight={handlePageHighlight}
               />
             ))}
           </div>
@@ -407,11 +459,24 @@ interface PdfPageProps {
   scale: number;
   /** Draw the page; off-screen pages are empty placeholders of the right size. */
   draw: boolean;
+  highlight: PassageHighlight | null;
+  onHighlight: (pageNumber: number, first: HTMLElement | null) => void;
 }
 
-const PdfPage = memo(function PdfPage({ pdf, pageNumber, size, scale, draw }: PdfPageProps) {
+const PdfPage = memo(function PdfPage({
+  pdf,
+  pageNumber,
+  size,
+  scale,
+  draw,
+  highlight,
+  onHighlight,
+}: PdfPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
+  // The rendered text layer's spans and their strings (same order).
+  const layerRef = useRef<{ divs: HTMLElement[]; strs: string[] } | null>(null);
+  const [layerVersion, setLayerVersion] = useState(0);
 
   useEffect(() => {
     if (!draw) return;
@@ -438,12 +503,16 @@ const PdfPage = memo(function PdfPage({ pdf, pageNumber, size, scale, draw }: Pd
       if (cancelled) return;
 
       textDiv.replaceChildren();
-      textLayer = new pdfjs.TextLayer({
+      const layer = new pdfjs.TextLayer({
         textContentSource: page.streamTextContent(),
         container: textDiv,
         viewport,
       });
-      await textLayer.render();
+      textLayer = layer;
+      await layer.render();
+      if (cancelled) return;
+      layerRef.current = { divs: layer.textDivs, strs: layer.textContentItemsStr };
+      setLayerVersion((v) => v + 1);
     })().catch((err) => {
       if (!cancelled && err?.name !== "RenderingCancelledException") {
         console.warn(`Failed to render page ${pageNumber}`, err);
@@ -452,10 +521,24 @@ const PdfPage = memo(function PdfPage({ pdf, pageNumber, size, scale, draw }: Pd
 
     return () => {
       cancelled = true;
+      layerRef.current = null;
       renderTask?.cancel();
       textLayer?.cancel();
     };
   }, [pdf, pageNumber, scale, draw]);
+
+  // Mark the passage's text items whenever the text layer or highlight changes.
+  useEffect(() => {
+    const layer = layerRef.current;
+    if (!layer) return;
+    for (const div of layer.divs) div.classList.remove("pdf-passage");
+    const position = highlight ? pagePosition(pageNumber, highlight.pageStart, highlight.pageEnd) : null;
+    if (!highlight || !position) return;
+    const items = findPassageItems(layer.strs, highlight.text, position) ?? [];
+    const marked = items.map((index) => layer.divs[index]).filter(Boolean);
+    for (const div of marked) div.classList.add("pdf-passage");
+    onHighlight(pageNumber, marked[0] ?? null);
+  }, [highlight, layerVersion, pageNumber, onHighlight]);
 
   const width = size.width * scale;
   const height = size.height * scale;

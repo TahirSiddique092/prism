@@ -95,7 +95,8 @@ def get_chunks_metadata(chunk_ids: list[int], conn=None) -> dict[int, dict]:
                 c.chunk_id, 
                 c.doc_id, 
                 c.chunk_text AS snippet, 
-                d.title AS doc_title
+                d.title AS doc_title,
+                c.page_start AS page
             FROM chunks c
             JOIN documents d ON c.doc_id = d.doc_id
             WHERE c.chunk_id IN ({format_strings})
@@ -113,6 +114,7 @@ def get_chunks_metadata(chunk_ids: list[int], conn=None) -> dict[int, dict]:
                     "doc_id": row["doc_id"],
                     "snippet": row["snippet"],
                     "doc_title": row["doc_title"],
+                    "page": row.get("page"),
                 }
             else:
                 c_id = row[0]
@@ -121,6 +123,7 @@ def get_chunks_metadata(chunk_ids: list[int], conn=None) -> dict[int, dict]:
                     "doc_id": row[1],
                     "snippet": row[2],
                     "doc_title": row[3],
+                    "page": row[4] if len(row) > 4 else None,
                 }
         return metadata
     finally:
@@ -141,7 +144,7 @@ def search_chunks_fulltext(
     - Run: SELECT chunk_id, chunk_text FROM chunks WHERE MATCH(chunk_text) AGAINST(:query IN NATURAL LANGUAGE MODE)
     - Filter to current user's documents only.
     - Return results in same response shape as semantic search:
-      [{ chunk_id, doc_id, doc_title, snippet, score: None }]
+      [{ chunk_id, doc_id, doc_title, snippet, score: None, page }]
     """
     clean_query = query.strip()
     if not clean_query:
@@ -162,7 +165,8 @@ def search_chunks_fulltext(
                 c.chunk_id, 
                 c.doc_id, 
                 d.title AS doc_title, 
-                c.chunk_text AS snippet
+                c.chunk_text AS snippet,
+                c.page_start AS page
             FROM chunks c
             JOIN documents d ON c.doc_id = d.doc_id
             WHERE d.user_id = %s
@@ -182,6 +186,7 @@ def search_chunks_fulltext(
                     "doc_title": str(row["doc_title"]),
                     "snippet": str(row["snippet"]),
                     "score": None,
+                    "page": row.get("page"),
                 })
             else:
                 results.append({
@@ -190,6 +195,7 @@ def search_chunks_fulltext(
                     "doc_title": str(row[2]),
                     "snippet": str(row[3]),
                     "score": None,
+                    "page": row[4] if len(row) > 4 else None,
                 })
         return results
     finally:

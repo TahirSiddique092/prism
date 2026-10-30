@@ -324,9 +324,7 @@ def _run_worker(fail_insert=None):
     with patch.dict(os.environ, {"POSTGRES_URL": "postgresql://example.invalid/db"}), \
          patch.object(worker, "get_s3_client", return_value=s3), \
          patch.object(worker, "fitz", MagicMock(open=MagicMock(return_value=[page]))), \
-         patch.object(worker, "_ensure_nltk"), \
-         patch.object(worker, "nltk", MagicMock(sent_tokenize=MagicMock(return_value=["s"]))), \
-         patch.object(worker, "chunk_sentences", return_value=["first", "second"]), \
+         patch.object(worker, "chunk_document", return_value=[("first", 1, 1), ("second", 1, 2)]), \
          patch.object(worker, "insert_chunks"), \
          patch.object(worker, "update_document_status") as status, \
          patch.object(worker, "_invalidate_owner_cache"), \
