@@ -304,10 +304,11 @@ def test_semantic_embedding_zero_overlapping_words():
 
 def test_search_score_is_raw_cosine_distance_ordered(client, user1_token):
     """AC: `score` in response is the raw cosine distance (lower = more similar), ordered ascending."""
+    # All within the 0.60 result cutoff (slice-31), so all three are returned
     fake_vector_results = [
         {"chunk_id": 1, "doc_id": 10, "score": 0.15},
         {"chunk_id": 2, "doc_id": 10, "score": 0.38},
-        {"chunk_id": 3, "doc_id": 10, "score": 0.72},
+        {"chunk_id": 3, "doc_id": 10, "score": 0.55},
     ]
     fake_metadata = {
         1: {"chunk_id": 1, "doc_id": 10, "snippet": "Best match", "doc_title": "Doc.pdf"},
@@ -331,7 +332,7 @@ def test_search_score_is_raw_cosine_distance_ordered(client, user1_token):
         assert res.status_code == 200
         data = res.get_json()["results"]
         assert len(data) == 3
-        assert [d["score"] for d in data] == [0.15, 0.38, 0.72]
+        assert [d["score"] for d in data] == [0.15, 0.38, 0.55]
         # Lower score = first in list
         assert data[0]["score"] < data[1]["score"] < data[2]["score"]
 

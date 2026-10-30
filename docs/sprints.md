@@ -10,7 +10,7 @@
 | [Sprint 4](sprints/sprint-04-graph-analytics.md) | Graph & analytics | 12–15 | slice-12, slice-13 | slice-14, slice-15 |
 | [Sprint 5](sprints/sprint-05-frontend.md) | Frontend | 16–20 | slice-16, slice-18, slice-20 | slice-17, slice-19 |
 | [Sprint 6](sprints/sprint-06-polish-deployment.md) | Polish & deployment | 21–23 | slice-22 | slice-21, slice-23 |
-| [Sprint 7](sprints/sprint-07-hardening-ux.md) | Hardening & UX | 24–30 | Unassigned | Unassigned |
+| [Sprint 7](sprints/sprint-07-hardening-ux.md) | Hardening & UX | 24–31 | Unassigned | Unassigned |
 
 ## Totals
 

@@ -79,6 +79,7 @@ NEXT_PUBLIC_API_URL
 - **Embedding:** `sentence-transformers/all-MiniLM-L6-v2` — do not swap models without an ADR
 - **Chunking:** `nltk.sent_tokenize` with ~200 word target and 1–2 sentence overlap
 - **Similarity threshold:** 0.75 cosine distance triggers FULLTEXT fallback — hardcoded for v1
+- **Result cutoff:** vector results beyond 0.60 cosine distance are dropped, except the best match (ADR-020) — hardcoded
 
 ## Testing
 

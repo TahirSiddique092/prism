@@ -5,6 +5,11 @@ from typing import List, Dict, Any, Tuple
 
 VECTOR_SIMILARITY_THRESHOLD = 0.75
 
+# Vector results further than this cosine distance (similarity below 0.40) are
+# dropped, except the single best match, so weak tail results don't pad the list.
+# Chosen from measurements on the course PDFs (ADR-020).
+RESULT_DISTANCE_CUTOFF = 0.60
+
 try:
     from backend.modules.documents.embed import get_embeddings
     from backend.modules.cache import get_cached_search, set_cached_search
@@ -42,7 +47,8 @@ def execute_semantic_search(user_id: int, query: str, limit: int = 10) -> Tuple[
     2. Retrieve user's document IDs to ensure isolation to authenticated user.
     3. If user has no documents, return empty list.
     4. Embed query using all-MiniLM-L6-v2.
-    5. Search pgvector ordered by cosine distance (embedding <=> query_vec).
+    5. Search pgvector ordered by cosine distance (embedding <=> query_vec),
+       then drop matches weaker than RESULT_DISTANCE_CUTOFF (the best is kept).
     6. Retrieve chunk snippet and document title metadata from MySQL.
     7. Assemble results [{ chunk_id, doc_id, doc_title, snippet, score, page }].
     8. Store results in Redis cache.
@@ -92,6 +98,9 @@ def execute_semantic_search(user_id: int, query: str, limit: int = 10) -> Tuple[
         set_cached_search(user_id, clean_query, fallback_results, ttl=3600)
         return fallback_results, False
 
+    # 5b. Drop weak matches (ADR-020)
+    vector_matches = drop_weak_matches(vector_matches)
+
     # 6. Fetch chunk snippets and doc titles from MySQL for vector matches
     chunk_ids = [m["chunk_id"] for m in vector_matches]
     metadata_map = get_chunks_metadata(chunk_ids)
@@ -116,6 +125,17 @@ def execute_semantic_search(user_id: int, query: str, limit: int = 10) -> Tuple[
     set_cached_search(user_id, clean_query, results, ttl=3600)
 
     return results, False
+
+
+def drop_weak_matches(matches: list[dict], cutoff: float = RESULT_DISTANCE_CUTOFF) -> list[dict]:
+    """Keep the best match and every other match within ``cutoff`` cosine distance.
+
+    ``matches`` are ordered best first. The best one is always kept: a query
+    whose best match is between the cutoff and VECTOR_SIMILARITY_THRESHOLD
+    still gets that one result, and anything weaker goes to the FULLTEXT
+    fallback before this point.
+    """
+    return [m for i, m in enumerate(matches) if i == 0 or m["score"] <= cutoff]
 
 
 def log_search(user_id: int, query: str, results: list[dict], conn=None) -> int | None:

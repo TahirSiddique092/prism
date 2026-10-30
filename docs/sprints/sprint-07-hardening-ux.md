@@ -15,6 +15,7 @@ Make PRISM dependable for everyday studying. Every store agrees with MySQL. The 
 - [x]  `slice-28-dashboard-status-retry` — Live processing status, retry failed documents — **Unassigned**
 - [x]  `slice-29-search-cache-speed` — Reuse Redis and Postgres connections so cached searches are fast — **Unassigned**
 - [x]  `slice-30-prism-favicon` — PRISM favicon instead of the Next.js default — **Unassigned**
+- [x]  `slice-31-search-result-cutoff` — Drop weak search results (cutoff 0.60, ADR-020) — **Unassigned**
 
 Also shipped during this sprint, outside the slice plan: the hotfix in PR #39 (prepared statements for free-text MySQL queries, ADR-017).
 
@@ -32,7 +33,7 @@ Sprint 6. The app runs end to end against the managed data services (ADR-015).
 
 ## Open questions (decide before scheduling)
 
-1. **Weak search results.** Search always returns the 10 nearest passages, however weak. The 10th result for "before insert trigger with delimiter" had cosine distance 0.64. Neighbouring passages from one PDF also repeat the same sentences, because chunks overlap. Possible fixes: drop results beyond a cutoff, and/or group results by document. AGENTS.md fixes the 0.75 fallback threshold for v1, so either change needs an ADR.
+1. **Weak search results.** *Resolved by slice-31: results beyond 0.60 cosine distance are dropped, the best is kept (ADR-020). Grouping by document was not done.* Search always returned the 10 nearest passages, however weak. The 10th result for "before insert trigger with delimiter" had cosine distance 0.64. Neighbouring passages from one PDF also repeat the same sentences, because chunks overlap. Possible fixes: drop results beyond a cutoff, and/or group results by document. AGENTS.md fixes the 0.75 fallback threshold for v1, so either change needs an ADR.
 2. **Slide footers in passages.** Repeated slide text such as "Database Management Systems 58" ends up in passages, snippets and embeddings. Once slice-27 tracks pages, repeated header and footer lines could be stripped per page. That changes chunk text, so existing documents would need re-processing.
 3. **Service regions.** Every query from India to Redis and Postgres costs a 230–550 ms round trip, even on a reused connection (see slice-29). Moving them to a nearer region would cut that further. This is an infra choice, possible only if the free tiers allow it.
 

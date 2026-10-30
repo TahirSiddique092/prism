@@ -53,6 +53,7 @@ CREATE INDEX idx_chunk_vectors_embedding
 | Distance | Cosine distance, operator `<=>`. 0 means identical meaning; larger means less similar. |
 | Index | **HNSW**, a graph-based approximate nearest-neighbour index. Migration 005 replaced the original ivfflat index because HNSW needs no training data. |
 | Confidence threshold | If the best distance is **> 0.75**, search falls back to MySQL FULLTEXT keyword search |
+| Result cutoff | Otherwise, results with distance **> 0.60** are dropped, except the best one (ADR-020) |
 
 ### Similarity query
 ```sql
@@ -417,6 +418,7 @@ sequenceDiagram
         API->>PG: ORDER BY embedding <=> query LIMIT 10
         PG-->>API: chunk_ids + distances
         alt best distance ≤ 0.75
+            API->>API: drop matches > 0.60 (keep the best)
             API->>MY: SELECT chunk text + doc title
         else low confidence
             API->>MY: FULLTEXT MATCH … AGAINST
