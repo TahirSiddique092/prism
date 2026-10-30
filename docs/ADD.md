@@ -63,6 +63,7 @@ flowchart LR
 | GET | `/api/documents/:doc_id/url` | — | `{ view_url }` |
 | POST | `/api/documents/upload` | `form-data: file, topics[]` | `{ doc_id, minio_key }` |
 | DELETE | `/api/documents/:doc_id` | — | `{ message }` |
+| POST | `/api/documents/:doc_id/retry` | — | `202 { doc_id, status: "processing" }`; 409 unless the document is in `error` |
 | GET | `/api/documents/:doc_id/related` | — | `[{ doc_id, title, shared_topics }]` |
 | GET | `/api/documents/:doc_id/chunks/:chunk_id` | — | `{ chunk_id, chunk_text, page_start, page_end }` |
 | POST | `/api/search` | `{ query, log? }` (`log: false` = don't record in search history) | `{ results: [{ chunk_id, doc_id, doc_title, snippet, score, page }], cached }` |

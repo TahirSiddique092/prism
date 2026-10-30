@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import LocalTime from "@/components/LocalTime";
+import { STATUS_POLL_MS, hasProcessing, markRetrying } from "@/lib/documents";
 
 export interface DocumentItem {
   doc_id: number;
@@ -34,6 +35,43 @@ export default function DashboardClient({ initialDocuments = [] }: DashboardClie
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const [retryingId, setRetryingId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  // Bumped whenever this page changes the list itself (upload, delete, retry),
+  // so a poll that started before the change can't overwrite it.
+  const listChangeRef = useRef(0);
+
+  // While any document is processing, re-read the list every few seconds so
+  // its status changes without a reload; also re-read whenever the window
+  // regains focus (slice-28).
+  const processing = hasProcessing(documents);
+  useEffect(() => {
+    async function refreshList() {
+      const startedAt = listChangeRef.current;
+      try {
+        const res = await fetch("/api/documents");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data) && startedAt === listChangeRef.current) {
+          setDocuments(data);
+        }
+      } catch {
+        // Try again on the next tick
+      }
+    }
+
+    const onFocus = () => {
+      refreshList();
+    };
+    window.addEventListener("focus", onFocus);
+    const timer = processing ? window.setInterval(refreshList, STATUS_POLL_MS) : null;
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      if (timer !== null) window.clearInterval(timer);
+    };
+  }, [processing]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setUploadError(null);
@@ -113,6 +151,7 @@ export default function DashboardClient({ initialDocuments = [] }: DashboardClie
         chunk_count: 0,
       };
 
+      listChangeRef.current += 1;
       setDocuments((prev) => [newDoc, ...prev]);
 
       // Reset form fields
@@ -149,12 +188,34 @@ export default function DashboardClient({ initialDocuments = [] }: DashboardClie
       }
 
       // Acceptance criteria: Deleted document disappears from the list without a full page reload
+      listChangeRef.current += 1;
       setDocuments((prev) => prev.filter((d) => d.doc_id !== docToDelete.doc_id));
       setDocToDelete(null);
     } catch {
       setDeleteError("Network error during document deletion.");
     } finally {
       setIsDeleting(false);
+    }
+  }
+
+  async function handleRetry(doc: DocumentItem) {
+    setRetryingId(doc.doc_id);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/documents/${doc.doc_id}/retry`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setActionError(
+          typeof data?.error === "string" ? data.error : "Retry failed. Please try again."
+        );
+        return;
+      }
+      listChangeRef.current += 1;
+      setDocuments((prev) => markRetrying(prev, doc.doc_id));
+    } catch {
+      setActionError("Network error while retrying. Please try again.");
+    } finally {
+      setRetryingId(null);
     }
   }
 
@@ -407,6 +468,12 @@ export default function DashboardClient({ initialDocuments = [] }: DashboardClie
         </span>
       </div>
 
+      {actionError && (
+        <div className="alert-error" role="alert" style={{ marginBottom: 16 }} data-testid="action-error">
+          <span>{actionError}</span>
+        </div>
+      )}
+
       {/* Populated Table or Empty State */}
       {documents.length > 0 ? (
         <div className="table-container" data-testid="table-container">
@@ -492,7 +559,21 @@ export default function DashboardClient({ initialDocuments = [] }: DashboardClie
                       </span>
                     )}
                   </td>
-                  <td style={{ textAlign: "right" }}>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    {doc.status === "error" && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{ marginRight: 8 }}
+                        onClick={() => handleRetry(doc)}
+                        disabled={retryingId === doc.doc_id}
+                        title="Process this document again"
+                        aria-label={`Retry processing ${doc.title}`}
+                        data-testid={`retry-btn-${doc.doc_id}`}
+                      >
+                        {retryingId === doc.doc_id ? <span className="spinner" /> : "Retry"}
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"

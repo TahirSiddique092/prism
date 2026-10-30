@@ -95,5 +95,20 @@ def create_app(test_config=None):
 app = create_app()
 
 if __name__ == "__main__":
+    # Documents are processed in background threads of this process, so one
+    # still 'processing' now was interrupted by a restart: mark it 'error' so
+    # it can be retried (slice-28). Done here, when the server starts, never
+    # on import, so tests and scripts that import the app change nothing.
+    try:
+        try:
+            from backend.modules.documents.db import mark_interrupted_processing_failed
+        except ImportError:
+            from modules.documents.db import mark_interrupted_processing_failed
+        interrupted = mark_interrupted_processing_failed()
+        if interrupted:
+            app.logger.warning(f"Marked {interrupted} interrupted document(s) as error; they can be retried")
+    except Exception as e:
+        app.logger.warning(f"Could not check for interrupted processing: {e}")
+
     port = int(os.getenv("PORT", "5000"))
     app.run(host="0.0.0.0", port=port)
