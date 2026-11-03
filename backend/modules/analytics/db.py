@@ -11,11 +11,11 @@ import warnings
 try:
     from backend.modules.auth.db import get_db_connection
     from backend.modules.timeutils import to_utc_iso
-    from backend.modules.dblog import logged_db_call
+    from backend.modules.dblog import log_db_event, logged_db_call
 except ImportError:
     from modules.auth.db import get_db_connection
     from modules.timeutils import to_utc_iso
-    from modules.dblog import logged_db_call
+    from modules.dblog import log_db_event, logged_db_call
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +58,10 @@ def call_procedure(conn, name: str, user_id: int) -> list[dict]:
 
 # Top documents queried from top_documents SQL view (Slice 15). Ranked by the
 # number of searches a document appeared in, then by passage hits (slice-25).
+# avg_similarity comes from the stored function fn_similarity (slice-34).
 TOP_DOCUMENTS_QUERY = """
-SELECT doc_id, title, search_count, appearance_count, avg_score
+SELECT doc_id, title, search_count, appearance_count, avg_score,
+       fn_similarity(avg_score) AS avg_similarity
 FROM top_documents
 WHERE user_id = %s
 ORDER BY search_count DESC, appearance_count DESC
@@ -156,6 +158,10 @@ def get_top_documents(user_id: int, conn=None) -> list[dict]:
             cursor.execute(TOP_DOCUMENTS_QUERY, (user_id,))
             rows = cursor.fetchall()
             call.rows = len(rows)
+        log_db_event(
+            "FUNCTION",
+            f"fn_similarity in the same top_documents query: {len(rows)} value{'' if len(rows) == 1 else 's'}",
+        )
         cursor.close()
 
         results = []
@@ -166,9 +172,10 @@ def get_top_documents(user_id: int, conn=None) -> list[dict]:
                 search_count = row["search_count"]
                 appearance_count = row["appearance_count"]
                 avg_score_val = row.get("avg_score")
+                avg_similarity_val = row.get("avg_similarity")
             else:
-                # Columns as selected: (doc_id, title, search_count, appearance_count, avg_score)
-                doc_id, title, search_count, appearance_count, avg_score_val = row[:5]
+                # Columns as selected: (doc_id, title, search_count, appearance_count, avg_score, avg_similarity)
+                doc_id, title, search_count, appearance_count, avg_score_val, avg_similarity_val = row[:6]
 
             results.append({
                 "doc_id": int(doc_id),
@@ -176,6 +183,7 @@ def get_top_documents(user_id: int, conn=None) -> list[dict]:
                 "search_count": int(search_count),
                 "appearance_count": int(appearance_count),
                 "avg_score": float(avg_score_val) if avg_score_val is not None else None,
+                "avg_similarity": float(avg_similarity_val) if avg_similarity_val is not None else None,
             })
 
         return results

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { formatSimilarity, SIMILARITY_TOOLTIP } from "../src/lib/scores.ts";
+import { formatScore, formatSimilarity, SIMILARITY_TOOLTIP } from "../src/lib/scores.ts";
 
 describe("Slice 25 — one score scale", () => {
   it("shows a cosine distance as similarity (1 − distance)", () => {
@@ -18,5 +18,12 @@ describe("Slice 25 — one score scale", () => {
   it("labels the scale so higher means closer", () => {
     assert.match(SIMILARITY_TOOLTIP, /similarity/i);
     assert.match(SIMILARITY_TOOLTIP, /higher is closer/);
+  });
+
+  it("shows a similarity computed by MySQL as is (slice-34)", () => {
+    assert.strictEqual(formatScore(0.5366), "0.5366");
+    assert.strictEqual(formatScore(0.53659999), "0.5366");
+    assert.strictEqual(formatScore(null), null);
+    assert.strictEqual(formatScore(undefined), null);
   });
 });

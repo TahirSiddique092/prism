@@ -24,14 +24,16 @@ def log_db_event(kind: str, description: str, level: int = logging.INFO) -> None
 
 class _Call:
     rows = None
+    result = None
 
 
 @contextmanager
 def logged_db_call(kind: str, description: str):
     """Time the block and log "<description> → N rows in M ms" when it ends.
 
-    Set ``call.rows`` inside the block to report a row count. Nothing is
-    logged if the block raises.
+    Set ``call.rows`` inside the block to report a row count, or
+    ``call.result`` to report a single value ("<description> = 43 in M ms").
+    Nothing is logged if the block raises.
 
         with logged_db_call("VIEW", f"top_documents read: user_id={user_id}") as call:
             rows = cursor.fetchall()
@@ -41,5 +43,10 @@ def logged_db_call(kind: str, description: str):
     start = time.perf_counter()
     yield call
     elapsed_ms = round((time.perf_counter() - start) * 1000)
-    rows = "" if call.rows is None else f" → {call.rows} row{'' if call.rows == 1 else 's'}"
-    log_db_event(kind, f"{description}{rows} in {elapsed_ms} ms")
+    if call.result is not None:
+        outcome = f" = {call.result}"
+    elif call.rows is not None:
+        outcome = f" → {call.rows} row{'' if call.rows == 1 else 's'}"
+    else:
+        outcome = ""
+    log_db_event(kind, f"{description}{outcome} in {elapsed_ms} ms")

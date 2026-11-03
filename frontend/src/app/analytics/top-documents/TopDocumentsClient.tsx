@@ -7,7 +7,7 @@ import {
   sortTopDocsByCount,
   type TopDocumentItem,
 } from "@/lib/analytics";
-import { formatSimilarity, SIMILARITY_TOOLTIP } from "@/lib/scores";
+import { formatScore, SIMILARITY_TOOLTIP } from "@/lib/scores";
 
 export default function TopDocumentsClient() {
   const router = useRouter();
@@ -208,9 +208,9 @@ export default function TopDocumentsClient() {
                     {doc.appearance_count}
                   </td>
                   <td style={{ textAlign: "right", fontFamily: "var(--font-mono, monospace)" }}>
-                    {formatSimilarity(doc.avg_score) !== null ? (
+                    {formatScore(doc.avg_similarity) !== null ? (
                       <span className="result-score" title={SIMILARITY_TOOLTIP}>
-                        {formatSimilarity(doc.avg_score)}
+                        {formatScore(doc.avg_similarity)}
                       </span>
                     ) : (
                       <span style={{ color: "var(--color-text-muted)" }}>—</span>

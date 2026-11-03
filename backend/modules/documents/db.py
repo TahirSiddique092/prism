@@ -5,12 +5,12 @@ try:
     from backend.modules.auth.db import get_db_connection
     from backend.modules.postgres import run_pg
     from backend.modules.timeutils import to_utc_iso
-    from backend.modules.dblog import log_db_event
+    from backend.modules.dblog import log_db_event, logged_db_call
 except ImportError:
     from modules.auth.db import get_db_connection
     from modules.postgres import run_pg
     from modules.timeutils import to_utc_iso
-    from modules.dblog import log_db_event
+    from modules.dblog import log_db_event, logged_db_call
 
 logger = logging.getLogger(__name__)
 
@@ -312,21 +312,22 @@ def get_user_documents(user_id: int, conn=None) -> list[dict]:
         except TypeError:
             cursor = conn.cursor()
 
+        # Chunk counts come from the stored function fn_chunk_count (slice-34)
         query = """
-            SELECT 
-                d.doc_id, 
-                d.title, 
-                d.uploaded_at, 
-                d.status, 
-                COUNT(c.chunk_id) AS chunk_count
+            SELECT
+                d.doc_id,
+                d.title,
+                d.uploaded_at,
+                d.status,
+                fn_chunk_count(d.doc_id) AS chunk_count
             FROM documents d
-            LEFT JOIN chunks c ON d.doc_id = c.doc_id
             WHERE d.user_id = %s
-            GROUP BY d.doc_id, d.title, d.uploaded_at, d.status
             ORDER BY d.uploaded_at DESC
         """
-        cursor.execute(query, (user_id,))
-        rows = cursor.fetchall()
+        with logged_db_call("FUNCTION", f"fn_chunk_count in the document list: user_id={user_id}") as call:
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+            call.rows = len(rows)
         cursor.close()
 
         results = []
@@ -361,6 +362,8 @@ def get_user_documents(user_id: int, conn=None) -> list[dict]:
 def get_document_chunk_count(doc_id: int, conn=None) -> int:
     """Return the number of chunks stored for a document (Slice 20).
 
+    Calls the stored function fn_chunk_count (slice-34).
+
     Kept as its own explicit query so the document-detail endpoint can report a
     chunk count without pulling the whole document list.
     """
@@ -371,8 +374,10 @@ def get_document_chunk_count(doc_id: int, conn=None) -> int:
 
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM chunks WHERE doc_id = %s", (doc_id,))
-        row = cursor.fetchone()
+        with logged_db_call("FUNCTION", f"fn_chunk_count(doc_id={doc_id})") as call:
+            cursor.execute("SELECT fn_chunk_count(%s)", (doc_id,))
+            row = cursor.fetchone()
+            call.result = row[0] if row else None
         cursor.close()
         if not row:
             return 0

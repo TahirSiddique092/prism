@@ -15,3 +15,11 @@ export function formatSimilarity(distance: number | null | undefined): string | 
   }
   return (1 - distance).toFixed(4);
 }
+
+/** A similarity the database already computed (fn_similarity, slice-34), to 4 decimals. */
+export function formatScore(similarity: number | null | undefined): string | null {
+  if (similarity === null || similarity === undefined || Number.isNaN(similarity)) {
+    return null;
+  }
+  return similarity.toFixed(4);
+}

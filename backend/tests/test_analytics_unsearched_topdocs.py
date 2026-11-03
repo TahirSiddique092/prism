@@ -388,9 +388,9 @@ def test_raw_sql_top_documents_tuple_fallback():
     mock_cursor = MagicMock()
     mock_conn.cursor.side_effect = lambda dictionary=False: mock_cursor if not dictionary else (_ for _ in ()).throw(TypeError())
 
-    # Tuple with (doc_id, title, search_count, appearance_count, avg_score)
+    # Tuple with (doc_id, title, search_count, appearance_count, avg_score, avg_similarity)
     mock_cursor.fetchall.return_value = [
-        (99, "Tuple Top Doc.pdf", 3, 7, 0.75)
+        (99, "Tuple Top Doc.pdf", 3, 7, 0.75, 0.25)
     ]
 
     docs = get_top_documents(user_id=4, conn=mock_conn)
@@ -400,6 +400,7 @@ def test_raw_sql_top_documents_tuple_fallback():
     assert docs[0]["search_count"] == 3
     assert docs[0]["appearance_count"] == 7
     assert docs[0]["avg_score"] == 0.75
+    assert docs[0]["avg_similarity"] == 0.25  # from fn_similarity (slice-34)
 
 
 # ============================================================================
