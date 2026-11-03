@@ -196,6 +196,7 @@ describe("Slice 19 — Frontend Analytics Pages & API Handlers", () => {
           search_count: 3,
           appearance_count: 9,
           avg_score: 0.3541,
+          avg_similarity: 0.6459,
         },
       ];
 
@@ -347,9 +348,9 @@ describe("Slice 19 — Frontend Analytics Pages & API Handlers", () => {
   describe("8. Page invariants: /analytics/top-documents", () => {
     it("sorts documents by search count, then appearance count, descending (slice-25)", () => {
       const raw: TopDocumentItem[] = [
-        { doc_id: 1, title: "Doc A", search_count: 3, appearance_count: 4, avg_score: 0.4 },
-        { doc_id: 2, title: "Doc B", search_count: 2, appearance_count: 20, avg_score: 0.2 },
-        { doc_id: 3, title: "Doc C", search_count: 3, appearance_count: 9, avg_score: 0.3 },
+        { doc_id: 1, title: "Doc A", search_count: 3, appearance_count: 4, avg_score: 0.4, avg_similarity: 0.6 },
+        { doc_id: 2, title: "Doc B", search_count: 2, appearance_count: 20, avg_score: 0.2, avg_similarity: 0.8 },
+        { doc_id: 3, title: "Doc C", search_count: 3, appearance_count: 9, avg_score: 0.3, avg_similarity: 0.7 },
       ];
       const sorted = sortTopDocsByCount(raw);
       // One search can return 10 passages of a document, so passages alone
@@ -364,6 +365,7 @@ describe("Slice 19 — Frontend Analytics Pages & API Handlers", () => {
         search_count: 2,
         appearance_count: 12,
         avg_score: 0.28543,
+        avg_similarity: 0.7146,
       };
       assert.ok(typeof itemWithScore.title === "string");
       assert.ok(itemWithScore.appearance_count > 0);
@@ -376,6 +378,7 @@ describe("Slice 19 — Frontend Analytics Pages & API Handlers", () => {
         search_count: 1,
         appearance_count: 1,
         avg_score: null,
+        avg_similarity: null,
       };
       assert.strictEqual(itemWithoutScore.avg_score, null);
     });

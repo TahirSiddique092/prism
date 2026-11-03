@@ -69,7 +69,7 @@ flowchart LR
 | POST | `/api/search` | `{ query, log? }` (`log: false` = don't record in search history) | `{ results: [{ chunk_id, doc_id, doc_title, snippet, score, page }], cached }` |
 | GET | `/api/analytics/history` | — | `[{ query_text, search_count, query_rank, last_searched, total_searches }]` |
 | GET | `/api/analytics/unsearched` | — | `[{ doc_id, title, uploaded_at }]` |
-| GET | `/api/analytics/top-documents` | — | `[{ doc_id, title, search_count, appearance_count, avg_score }]` |
+| GET | `/api/analytics/top-documents` | — | `[{ doc_id, title, search_count, appearance_count, avg_score, avg_similarity }]` |
 
 All protected routes require `Authorization: Bearer <token>` header.
 

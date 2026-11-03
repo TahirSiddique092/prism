@@ -135,8 +135,10 @@ def test_top_documents_logs_the_view(db_lines):
     ]
     get_top_documents(user_id=2, conn=conn)
 
-    (line,) = db_lines()
-    assert re.fullmatch(r"\[DB\] VIEW      top_documents read: user_id=2 → 2 rows in \d+ ms", line)
+    view_line, function_line = db_lines()
+    assert re.fullmatch(r"\[DB\] VIEW      top_documents read: user_id=2 → 2 rows in \d+ ms", view_line)
+    # The same query also uses the stored function fn_similarity (slice-34)
+    assert function_line == "[DB] FUNCTION  fn_similarity in the same top_documents query: 2 values"
 
 
 def test_db_lines_carry_no_personal_data(db_lines):
@@ -148,7 +150,7 @@ def test_db_lines_carry_no_personal_data(db_lines):
     get_top_documents(user_id=2, conn=conn)
 
     lines = db_lines()
-    assert len(lines) == 2
+    assert len(lines) == 3  # TRIGGER, VIEW, FUNCTION
     for line in lines:
         assert "@" not in line and "Private notes" not in line
         assert not re.search(r"password|token|query_text|chunk_text", line, re.I)

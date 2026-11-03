@@ -194,7 +194,7 @@ Audit trail written by a trigger whenever a document is deleted.
 
 ---
 
-## 5. Constraints, cascades, trigger, view, stored procedures, indexes
+## 5. Constraints, cascades, trigger, view, stored procedures and functions, indexes
 
 ### Cascade chain
 Deleting a user or a document cleans up everything that depends on it:
@@ -247,6 +247,31 @@ CALL sp_search_history(2);
 CALL sp_unsearched_documents(2);
 ```
 
+### Stored functions
+Two user-defined functions are used inside the app's queries (migration 009). Each declares what kind of SQL it runs, which MySQL requires when binary logging is on. Each use logs a `[DB] FUNCTION` line.
+
+| Function | Returns | Used in |
+|---|---|---|
+| `fn_chunk_count(p_doc_id INT)`, `READS SQL DATA` | INT: the number of chunks a document has (0 if none) | Document list and document detail |
+| `fn_similarity(p_distance DOUBLE)`, `DETERMINISTIC NO SQL` | DOUBLE: `1 - p_distance` (NULL stays NULL) | Top Documents, as `avg_similarity` |
+
+```sql
+CREATE FUNCTION fn_chunk_count(p_doc_id INT)
+RETURNS INT
+READS SQL DATA
+BEGIN
+    DECLARE total INT;
+    SELECT COUNT(*) INTO total FROM chunks WHERE doc_id = p_doc_id;
+    RETURN total;
+END;
+
+CREATE FUNCTION fn_similarity(p_distance DOUBLE)
+RETURNS DOUBLE
+DETERMINISTIC
+NO SQL
+RETURN 1 - p_distance;
+```
+
 ### Indexes
 | Index | On | Why |
 |---|---|---|
@@ -280,14 +305,17 @@ These are the main SQL statements the backend runs. Every one is parameterised a
 SELECT user_id, name, email, password_hash, created_at FROM users WHERE email = %s;
 ```
 
-**Document list with chunk counts** (documents, LEFT JOIN + GROUP BY)
+**Document list with chunk counts** (documents, stored function)
 ```sql
-SELECT d.doc_id, d.title, d.uploaded_at, d.status, COUNT(c.chunk_id) AS chunk_count
+SELECT d.doc_id, d.title, d.uploaded_at, d.status, fn_chunk_count(d.doc_id) AS chunk_count
 FROM documents d
-LEFT JOIN chunks c ON d.doc_id = c.doc_id
 WHERE d.user_id = %s
-GROUP BY d.doc_id, d.title, d.uploaded_at, d.status
 ORDER BY d.uploaded_at DESC;
+```
+
+**Chunk count for one document** (document detail, stored function)
+```sql
+SELECT fn_chunk_count(%s);
 ```
 
 **Keyword fallback search** (search, FULLTEXT). Used when vector search is not confident enough.
@@ -330,9 +358,10 @@ WHERE user_id = p_user_id
   AND doc_id NOT IN (SELECT doc_id FROM searched_docs);
 ```
 
-**Top documents** (analytics, view)
+**Top documents** (analytics, view and stored function)
 ```sql
-SELECT doc_id, title, search_count, appearance_count, avg_score
+SELECT doc_id, title, search_count, appearance_count, avg_score,
+       fn_similarity(avg_score) AS avg_similarity
 FROM top_documents
 WHERE user_id = %s
 ORDER BY search_count DESC, appearance_count DESC

@@ -63,7 +63,7 @@ def top_documents():
     """GET /api/analytics/top-documents (Slice 15).
 
     Returns documents ranked by how many searches they appeared in (slice-25).
-    Response: [{ doc_id, title, search_count, appearance_count, avg_score }]
+    Response: [{ doc_id, title, search_count, appearance_count, avg_score, avg_similarity }]
     """
     user_id = g.user_id
     try:

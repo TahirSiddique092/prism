@@ -23,8 +23,10 @@ export interface TopDocumentItem {
   search_count: number;
   /** Number of its passages returned across those searches (up to 10 per search). */
   appearance_count: number;
-  /** Average cosine distance; shown as similarity via formatSimilarity. */
+  /** Average cosine distance (lower is closer). */
   avg_score: number | null;
+  /** 1 − avg_score, computed in MySQL by fn_similarity (slice-34); shown on the page. */
+  avg_similarity: number | null;
 }
 
 export const ANALYTICS_NAV_ITEMS = [
