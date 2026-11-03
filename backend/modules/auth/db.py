@@ -96,3 +96,48 @@ def create_user(name: str, email: str, password_hash: str, conn=None) -> int:
     finally:
         if should_close and conn:
             conn.close()
+
+
+def find_user_by_id(user_id: int, conn=None):
+    """Fetch the public fields of one user, including their role (slice-35).
+
+    Returns {user_id, name, email, role} or None. Never the password hash.
+    """
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id, name, email, role FROM users WHERE user_id = %s", (user_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return None
+        return {"user_id": row[0], "name": row[1], "email": row[2], "role": row[3]}
+    finally:
+        if should_close and conn:
+            conn.close()
+
+
+def get_user_role(user_id: int, conn=None):
+    """The user's role, 'user' or 'admin', or None if the user doesn't exist (slice-35).
+
+    Read from MySQL on every admin request, not from the JWT, so promoting or
+    demoting someone takes effect on their next request.
+    """
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT role FROM users WHERE user_id = %s", (user_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        return row[0] if row else None
+    finally:
+        if should_close and conn:
+            conn.close()

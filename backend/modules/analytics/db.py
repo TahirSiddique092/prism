@@ -6,55 +6,21 @@ As per project guidelines (AGENTS.md):
 - Raw SQL via mysql-connector-python
 """
 import logging
-import warnings
 
 try:
     from backend.modules.auth.db import get_db_connection
     from backend.modules.timeutils import to_utc_iso
-    from backend.modules.dblog import log_db_event, logged_db_call
+    from backend.modules.dblog import call_procedure, log_db_event, logged_db_call
 except ImportError:
     from modules.auth.db import get_db_connection
     from modules.timeutils import to_utc_iso
-    from modules.dblog import log_db_event, logged_db_call
+    from modules.dblog import call_procedure, log_db_event, logged_db_call
 
 logger = logging.getLogger(__name__)
 
 # The search-history (window functions) and unsearched-documents (CTE) queries
 # live in MySQL as stored procedures sp_search_history and sp_unsearched_documents,
 # created by migrations/008_stored_procedures.sql (slice-33).
-
-
-def _stored_results(cursor):
-    """The result sets of the last callproc.
-
-    stored_results is a method in the mysql-connector releases we support and is
-    becoming a property (calling the method now warns), so both forms work.
-    """
-    results = cursor.stored_results
-    if callable(results):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            results = results()
-    return results
-
-
-def call_procedure(conn, name: str, user_id: int) -> list[dict]:
-    """CALL a stored procedure that takes a user ID; return its rows as dicts (slice-33).
-
-    The procedures take integer arguments only, so ADR-017 (prepared statements
-    for free text) doesn't apply. Logs a [DB] PROCEDURE line.
-    """
-    cursor = conn.cursor()
-    with logged_db_call("PROCEDURE", f"{name}(user_id={user_id})") as call:
-        cursor.callproc(name, (user_id,))
-        rows = []
-        for result in _stored_results(cursor):
-            columns = result.column_names
-            rows.extend(dict(zip(columns, row)) for row in result.fetchall())
-        call.rows = len(rows)
-    cursor.close()
-    return rows
-
 
 # Top documents queried from top_documents SQL view (Slice 15). Ranked by the
 # number of searches a document appeared in, then by passage hits (slice-25).
@@ -87,7 +53,7 @@ def get_search_history(user_id: int, conn=None) -> list[dict]:
         should_close = True
 
     try:
-        rows = call_procedure(conn, "sp_search_history", user_id)
+        rows = call_procedure(conn, "sp_search_history", user_id=user_id)
         return [
             {
                 "query_text": str(row["query_text"]),
@@ -119,7 +85,7 @@ def get_unsearched_documents(user_id: int, conn=None) -> list[dict]:
         should_close = True
 
     try:
-        rows = call_procedure(conn, "sp_unsearched_documents", user_id)
+        rows = call_procedure(conn, "sp_unsearched_documents", user_id=user_id)
         return [
             {
                 "doc_id": int(row["doc_id"]),

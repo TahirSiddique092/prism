@@ -4,11 +4,12 @@ Implements:
 - POST /api/auth/register
 - POST /api/auth/login
 - POST /api/auth/logout
+- GET  /api/auth/me (slice-35)
 """
 import mysql.connector
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 
-from .db import create_user, find_user_by_email
+from .db import create_user, find_user_by_email, find_user_by_id
 from .middleware import require_auth
 from .service import MAX_PASSWORD_BYTES, check_password, generate_token, hash_password
 
@@ -126,3 +127,17 @@ def logout():
     """
     return jsonify({"message": "logged out"}), 200
 
+
+
+@auth_bp.route("/me", methods=["GET"])
+@require_auth
+def me():
+    """The signed-in user's public profile, including their role (slice-35).
+
+    Response: { user_id, name, email, role } (HTTP 200). The frontend uses the
+    role to decide whether to show the Admin link.
+    """
+    user = find_user_by_id(g.user_id)
+    if not user:
+        return jsonify({"error": "Unauthorized — account not found"}), 401
+    return jsonify(user), 200

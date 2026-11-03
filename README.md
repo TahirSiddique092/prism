@@ -71,7 +71,7 @@ datastores. Database migrations run automatically on backend startup.
 
 ```
 frontend/   Next.js app (Dockerfile + standalone build)
-backend/    Flask API, modules (auth, documents, search, cache, graph, analytics)
+backend/    Flask API, modules (auth, documents, search, cache, graph, analytics, admin)
             db/migrations/  — raw SQL migrations (MySQL + pgvector)
 docs/       PRD, architecture, slices, and decision records (ADRs)
 docker-compose.yml   — the whole stack
@@ -102,6 +102,17 @@ docker compose exec backend python backend/db/backfill_chunk_pages.py --apply   
 ```
 
 The script re-splits each PDF exactly as the worker does and only writes pages when the result matches the stored chunks; anything else is reported and left alone.
+
+## Making someone an admin
+
+Every account is a `user` when it registers. Admins also see the Admin page (every user with their counts, system totals and the deletion log). The only way to change a role is this script:
+
+```bash
+docker compose exec backend python backend/db/set_role.py --email someone@example.com --role admin   # promote
+docker compose exec backend python backend/db/set_role.py --email someone@example.com --role user    # demote
+```
+
+The change takes effect on the person's next request; they don't need to log in again. An unknown email prints an error and exits with 1.
 
 ## Running the tests
 

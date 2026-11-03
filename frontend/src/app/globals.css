@@ -1312,3 +1312,38 @@ dialog.prism-dialog::backdrop {
   color: #93c5fd;
   white-space: nowrap;
 }
+
+/* Admin page (slice-35) */
+.admin-section {
+  margin-bottom: 32px;
+}
+
+.admin-section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 12px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono, monospace);
+}
