@@ -343,7 +343,9 @@ def test_raw_sql_delete_document_triggers_contract():
     result = delete_document(doc_id=55, user_id=1, conn=mock_conn)
     assert result is True
 
-    mock_cursor.execute.assert_called_once_with(
+    # The DELETE runs between the chunk count and the deletion_audit check that
+    # confirm the trigger for the [DB] log line (slice-32).
+    mock_cursor.execute.assert_any_call(
         "DELETE FROM documents WHERE doc_id = %s AND user_id = %s",
         (55, 1),
     )

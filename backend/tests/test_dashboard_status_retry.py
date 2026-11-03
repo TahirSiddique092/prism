@@ -173,6 +173,7 @@ def test_starting_the_server_recovers_interrupted_documents():
     app_path = Path(__file__).resolve().parents[1] / "app.py"
     with patch("backend.modules.documents.db.mark_interrupted_processing_failed", return_value=2) as recover, \
          patch("flask.Flask.run") as run, \
+         patch("logging.basicConfig"), \
          patch("backend.modules.documents.storage.ensure_bucket_exists"):
         runpy.run_path(str(app_path), run_name="__main__")
 
@@ -185,6 +186,7 @@ def test_server_still_starts_if_recovery_fails():
     with patch("backend.modules.documents.db.mark_interrupted_processing_failed",
                side_effect=RuntimeError("MySQL unreachable")), \
          patch("flask.Flask.run") as run, \
+         patch("logging.basicConfig"), \
          patch("backend.modules.documents.storage.ensure_bucket_exists"):
         runpy.run_path(str(app_path), run_name="__main__")
 

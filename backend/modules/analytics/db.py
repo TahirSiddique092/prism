@@ -10,9 +10,11 @@ import logging
 try:
     from backend.modules.auth.db import get_db_connection
     from backend.modules.timeutils import to_utc_iso
+    from backend.modules.dblog import logged_db_call
 except ImportError:
     from modules.auth.db import get_db_connection
     from modules.timeutils import to_utc_iso
+    from modules.dblog import logged_db_call
 
 logger = logging.getLogger(__name__)
 
@@ -180,8 +182,10 @@ def get_top_documents(user_id: int, conn=None) -> list[dict]:
         except (TypeError, AttributeError):
             cursor = conn.cursor()
 
-        cursor.execute(TOP_DOCUMENTS_QUERY, (user_id,))
-        rows = cursor.fetchall()
+        with logged_db_call("VIEW", f"top_documents read: user_id={user_id}") as call:
+            cursor.execute(TOP_DOCUMENTS_QUERY, (user_id,))
+            rows = cursor.fetchall()
+            call.rows = len(rows)
         cursor.close()
 
         results = []

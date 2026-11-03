@@ -39,6 +39,11 @@ Log a TRIGGER line with the new `audit_id` and the number of chunks the cascade 
 ### 4. Log the view
 `get_top_documents` (`backend/modules/analytics/db.py`) logs a VIEW line each time it reads `top_documents`.
 
+### 5. Keep search text out of the existing INFO lines
+**Problem:** Once INFO is visible, two existing lines in `search/service.py` (cache hit and FULLTEXT fallback) would print the user's search text.
+
+**Change:** they log the user ID instead (and the query length for a cache hit).
+
 ## Acceptance criteria
 
 - Deleting a document prints a `[DB] TRIGGER` line with the `doc_id`, the new `deletion_audit.audit_id` and the number of chunks removed by the cascade
@@ -47,6 +52,7 @@ Log a TRIGGER line with the new `audit_id` and the number of chunks the cascade 
 - Opening Top Documents prints a `[DB] VIEW` line with the user ID, the row count and the time
 - INFO lines that already exist in the backend (for example the FULLTEXT fallback message) now appear in `docker compose logs`
 - No `[DB]` line contains a password, token, email address, search text or document text
+- The cache-hit and FULLTEXT-fallback INFO lines don't contain the search text
 - Tests capture the log output (pytest `caplog`) and check each line above
 
 ## Out of scope

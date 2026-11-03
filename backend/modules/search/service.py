@@ -61,7 +61,8 @@ def execute_semantic_search(user_id: int, query: str, limit: int = 10) -> Tuple[
     # 1. Check Redis cache before computing embedding
     cached_results = get_cached_search(user_id, clean_query)
     if cached_results is not None:
-        logger.info(f"Cache hit for search query: '{clean_query}' (user_id={user_id})")
+        # No search text in logs (slice-32): it is the user's own content.
+        logger.info(f"Cache hit for a search by user {user_id} ({len(clean_query)} characters)")
         return cached_results, True
 
     # 2. Get user's document IDs from MySQL
@@ -90,7 +91,7 @@ def execute_semantic_search(user_id: int, query: str, limit: int = 10) -> Tuple[
 
     if is_fallback:
         logger.info(
-            f"Triggering MySQL FULLTEXT fallback for user {user_id}, query: '{clean_query}'. "
+            f"Triggering MySQL FULLTEXT fallback for a search by user {user_id}. "
             f"Best vector score: {vector_matches[0]['score'] if vector_matches else 'none'} "
             f"(threshold={VECTOR_SIMILARITY_THRESHOLD})"
         )
