@@ -194,7 +194,7 @@ Audit trail written by a trigger whenever a document is deleted.
 
 ---
 
-## 5. Constraints, cascades, view, trigger, indexes
+## 5. Constraints, cascades, trigger, view, stored procedures, indexes
 
 ### Cascade chain
 Deleting a user or a document cleans up everything that depends on it:
@@ -232,6 +232,19 @@ FROM search_results sr
 JOIN chunks c    ON sr.chunk_id = c.chunk_id
 JOIN documents d ON c.doc_id    = d.doc_id
 GROUP BY d.doc_id, d.user_id, d.title;
+```
+
+### Stored procedures
+The two analytics queries live in MySQL as stored procedures (migration 008). The backend runs them with `CALL`, through `cursor.callproc`, and logs a `[DB] PROCEDURE` line for each call. Their bodies are under Key queries (§ 7).
+
+| Procedure | Returns | Used by |
+|---|---|---|
+| `sp_search_history(IN p_user_id INT)` | The user's searches, ranked by how often they were run (window functions) | Search History page |
+| `sp_unsearched_documents(IN p_user_id INT)` | The user's ready documents that never appeared in a search (CTE) | Unsearched Documents page |
+
+```sql
+CALL sp_search_history(2);
+CALL sp_unsearched_documents(2);
 ```
 
 ### Indexes
@@ -287,7 +300,7 @@ WHERE d.user_id = %s
 LIMIT %s;
 ```
 
-**Search history** (analytics, window functions)
+**Search history** (analytics, window functions): the body of `sp_search_history`
 ```sql
 SELECT query_text,
        COUNT(*)                             AS search_count,
@@ -295,12 +308,12 @@ SELECT query_text,
        MAX(searched_at)                     AS last_searched,
        SUM(COUNT(*)) OVER ()                AS total_searches
 FROM search_log
-WHERE user_id = %s
+WHERE user_id = p_user_id
 GROUP BY query_text
 ORDER BY query_rank;
 ```
 
-**Never-searched documents** (analytics, CTE)
+**Never-searched documents** (analytics, CTE): the body of `sp_unsearched_documents`
 ```sql
 WITH searched_docs AS (
     SELECT DISTINCT d.doc_id
@@ -308,11 +321,11 @@ WITH searched_docs AS (
     JOIN chunks c      ON sr.chunk_id = c.chunk_id
     JOIN documents d   ON c.doc_id    = d.doc_id
     JOIN search_log sl ON sr.log_id   = sl.log_id
-    WHERE sl.user_id = %s
+    WHERE sl.user_id = p_user_id
 )
 SELECT doc_id, title, uploaded_at
 FROM documents
-WHERE user_id = %s
+WHERE user_id = p_user_id
   AND status = 'ready'
   AND doc_id NOT IN (SELECT doc_id FROM searched_docs);
 ```
@@ -427,8 +440,8 @@ flowchart LR
 ```mermaid
 flowchart LR
     S[Student]
-    P61([6.1 Search history<br/>window functions])
-    P62([6.2 Unsearched documents<br/>CTE])
+    P61([6.1 Search history<br/>CALL sp_search_history<br/>window functions])
+    P62([6.2 Unsearched documents<br/>CALL sp_unsearched_documents<br/>CTE])
     P63([6.3 Top documents<br/>view])
     DL[(D1.5 search_log)]
     DR[(D1.6 search_results)]

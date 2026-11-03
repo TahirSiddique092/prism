@@ -5,9 +5,6 @@ import mysql.connector
 import psycopg2
 from dotenv import load_dotenv
 
-# Load env config
-load_dotenv(Path(__file__).parent.parent.parent / ".env")
-
 def get_mysql_conn():
     url = os.getenv("MYSQL_URL")
     if url:
@@ -94,6 +91,58 @@ def record_migration_pg(conn, migration_name):
     except Exception as e:
         print(f"Warning: could not record {migration_name} in Postgres schema_migrations: {e}")
 
+def _only_comments(sql: str) -> bool:
+    return all(not line.strip() or line.strip().startswith("--") for line in sql.splitlines())
+
+
+def _pieces(text: str, terminator: str) -> list:
+    pieces = []
+    for piece in text.split(terminator):
+        piece = piece.strip()
+        if piece and not _only_comments(piece):
+            pieces.append(piece)
+    return pieces
+
+
+def split_mysql_script(script: str) -> list:
+    """Split a MySQL migration into statements, in order (slice-33).
+
+    Outside a `DELIMITER //` ... `DELIMITER ;` block a statement ends with ";".
+    Inside one it ends with "//", so trigger, procedure and function bodies can
+    contain ";". A file may have any number of blocks. Returns
+    (statement, in_block) pairs; pieces that are only comments are dropped.
+    Don't put "//" in comments or strings inside a block.
+    """
+    statements = []
+    rest = script
+    while rest:
+        before, found, after = rest.partition("DELIMITER //")
+        statements += [(sql, False) for sql in _pieces(before, ";")]
+        if not found:
+            break
+        block, _, rest = after.partition("DELIMITER ;")
+        statements += [(sql, True) for sql in _pieces(block, "//")]
+    return statements
+
+
+def apply_mysql_script(cursor, script: str) -> None:
+    """Run each statement of a MySQL migration in order (slice-33).
+
+    "Already exists" errors are tolerated so a migration can be re-run:
+    plain statements 1050 (table), 1060 (column), 1061 (key name);
+    DELIMITER blocks 1304 (trigger or routine).
+    """
+    for stmt, in_block in split_mysql_script(script):
+        try:
+            cursor.execute(stmt)
+        except mysql.connector.Error as err:
+            tolerated = (1304,) if in_block else (1050, 1060, 1061)
+            if err.errno in tolerated:
+                print(f"Notice: {err.msg} (continuing)")
+            else:
+                raise
+
+
 def run_migrations():
     migrations_dir = Path(__file__).parent / "migrations"
     migration_files = sorted(migrations_dir.glob("*.sql"))
@@ -125,31 +174,7 @@ def run_migrations():
             else:
                 print(f"Running MySQL migration: {name}")
                 cursor = mysql_conn.cursor()
-                statements = mysql_script.split("DELIMITER //")
-                for stmt in statements[0].split(";"):
-                    stmt = stmt.strip()
-                    if stmt:
-                        try:
-                            cursor.execute(stmt)
-                        except mysql.connector.Error as err:
-                            # 1050: Table already exists, 1060: Duplicate column, 1061: Duplicate key name
-                            if err.errno in (1050, 1060, 1061):
-                                print(f"Notice: {err.msg} (continuing)")
-                            else:
-                                raise
-                if len(statements) > 1:
-                    trigger_block = statements[1].split("DELIMITER ;")[0].strip()
-                    if trigger_block.endswith("//"):
-                        trigger_block = trigger_block[:-2].strip()
-                    if trigger_block:
-                        try:
-                            cursor.execute(trigger_block)
-                        except mysql.connector.Error as err:
-                            # 1304: Trigger already exists
-                            if err.errno in (1304,):
-                                print(f"Notice: {err.msg} (continuing)")
-                            else:
-                                raise
+                apply_mysql_script(cursor, mysql_script)
                 cursor.close()
                 record_migration_mysql(mysql_conn, name)
 
@@ -175,4 +200,7 @@ def run_migrations():
     print("All migrations completed.")
 
 if __name__ == "__main__":
+    # Load .env only when run as a script. Importing this module (tests,
+    # reconcile.py, backfill_chunk_pages.py) must never change the environment.
+    load_dotenv(Path(__file__).parent.parent.parent / ".env")
     run_migrations()

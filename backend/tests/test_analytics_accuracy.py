@@ -18,7 +18,6 @@ import pytest
 
 from backend.app import create_app
 from backend.modules.analytics.db import (
-    UNSEARCHED_DOCS_QUERY,
     get_search_history,
     get_unsearched_documents,
 )
@@ -71,6 +70,16 @@ def test_mysql_session_time_zone_is_utc(monkeypatch, env):
     assert get_db_config()["time_zone"] == "+00:00"
 
 
+def _proc_conn(rows):
+    """A mock connection whose stored procedure returns ``rows`` (dicts) (slice-33)."""
+    conn = MagicMock()
+    result = MagicMock()
+    result.column_names = tuple(rows[0]) if rows else ()
+    result.fetchall.return_value = [tuple(r.values()) for r in rows]
+    conn.cursor.return_value.stored_results.return_value = [result]
+    return conn
+
+
 def _dict_conn(rows):
     conn = MagicMock()
     conn.cursor.return_value.fetchall.return_value = rows
@@ -82,12 +91,12 @@ def test_search_history_last_searched_is_utc_with_z():
         "query_text": "weak entity", "search_count": 1, "query_rank": 1,
         "last_searched": datetime.datetime(2026, 10, 29, 16, 0, 9), "total_searches": 1,
     }]
-    assert get_search_history(1, conn=_dict_conn(rows))[0]["last_searched"] == "2026-10-29T16:00:09Z"
+    assert get_search_history(1, conn=_proc_conn(rows))[0]["last_searched"] == "2026-10-29T16:00:09Z"
 
 
 def test_unsearched_uploaded_at_is_utc_with_z():
     rows = [{"doc_id": 3, "title": "a.pdf", "uploaded_at": datetime.datetime(2026, 10, 29, 15, 57, 49)}]
-    assert get_unsearched_documents(1, conn=_dict_conn(rows))[0]["uploaded_at"] == "2026-10-29T15:57:49Z"
+    assert get_unsearched_documents(1, conn=_proc_conn(rows))[0]["uploaded_at"] == "2026-10-29T15:57:49Z"
 
 
 def test_document_list_uploaded_at_is_utc_with_z():
@@ -173,7 +182,10 @@ def test_migration_006_is_one_statement_for_the_migration_runner():
 
 
 def test_unsearched_query_only_lists_ready_documents():
-    assert "AND status = 'ready'" in UNSEARCHED_DOCS_QUERY
+    # The query lives in the stored procedure since slice-33
+    sql = (Path(__file__).parent.parent / "db" / "migrations" / "008_stored_procedures.sql").read_text()
+    body = sql[sql.index("CREATE PROCEDURE sp_unsearched_documents("):]
+    assert "AND status = 'ready'" in body[:body.index("END //")]
 
 
 # ============================================================================
