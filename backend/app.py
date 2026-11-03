@@ -1,4 +1,5 @@
 """PRISM Backend Flask Application Entry Point."""
+import logging
 import os
 import sys
 from pathlib import Path
@@ -92,9 +93,27 @@ def create_app(test_config=None):
     return app
 
 
+def configure_logging():
+    """Send INFO logs, including the [DB] lines (slice-32), to the terminal.
+
+    Without this, Python's default level (WARNING) drops every logger.info
+    call. Libraries that are chatty at INFO stay at WARNING.
+    """
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    for name in ("httpx", "httpcore", "urllib3", "botocore", "boto3", "s3transfer",
+                 "sentence_transformers", "huggingface_hub", "filelock", "neo4j"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
 app = create_app()
 
 if __name__ == "__main__":
+    configure_logging()
+    startup_logger = logging.getLogger("prism.startup")
+
     # Documents are processed in background threads of this process, so one
     # still 'processing' now was interrupted by a restart: mark it 'error' so
     # it can be retried (slice-28). Done here, when the server starts, never
@@ -106,9 +125,9 @@ if __name__ == "__main__":
             from modules.documents.db import mark_interrupted_processing_failed
         interrupted = mark_interrupted_processing_failed()
         if interrupted:
-            app.logger.warning(f"Marked {interrupted} interrupted document(s) as error; they can be retried")
+            startup_logger.warning(f"Marked {interrupted} interrupted document(s) as error; they can be retried")
     except Exception as e:
-        app.logger.warning(f"Could not check for interrupted processing: {e}")
+        startup_logger.warning(f"Could not check for interrupted processing: {e}")
 
     port = int(os.getenv("PORT", "5000"))
     app.run(host="0.0.0.0", port=port)

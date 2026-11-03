@@ -1,13 +1,18 @@
 """Database operations for the documents module using raw SQL."""
+import logging
 
 try:
     from backend.modules.auth.db import get_db_connection
     from backend.modules.postgres import run_pg
     from backend.modules.timeutils import to_utc_iso
+    from backend.modules.dblog import log_db_event
 except ImportError:
     from modules.auth.db import get_db_connection
     from modules.postgres import run_pg
     from modules.timeutils import to_utc_iso
+    from modules.dblog import log_db_event
+
+logger = logging.getLogger(__name__)
 
 def insert_document(user_id: int, title: str, minio_key: str, conn=None) -> int:
     """Insert a new document record into MySQL using raw SQL.
@@ -423,6 +428,9 @@ def delete_document(doc_id: int, user_id: int = None, conn=None) -> bool:
     This activates the MySQL trigger before_document_delete which logs to deletion_audit,
     and ON DELETE CASCADE automatically deletes corresponding chunks.
     Returns True if a row was deleted, False if no document matched.
+
+    The trigger runs inside MySQL, so the backend confirms it by reading the
+    new deletion_audit row and logs a [DB] TRIGGER line (slice-32).
     """
     should_close = False
     if conn is None:
@@ -430,6 +438,7 @@ def delete_document(doc_id: int, user_id: int = None, conn=None) -> bool:
         should_close = True
 
     try:
+        chunks_before = _count_chunks_for_log(conn, doc_id)
         cursor = conn.cursor()
         if user_id is not None:
             query = "DELETE FROM documents WHERE doc_id = %s AND user_id = %s"
@@ -440,10 +449,56 @@ def delete_document(doc_id: int, user_id: int = None, conn=None) -> bool:
         conn.commit()
         deleted = cursor.rowcount > 0
         cursor.close()
+        if deleted:
+            _log_delete_trigger(conn, doc_id, chunks_before)
         return deleted
     finally:
         if should_close and conn:
             conn.close()
+
+
+def _count_chunks_for_log(conn, doc_id: int):
+    """Chunks the cascade is about to remove, or None if they can't be counted."""
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM chunks WHERE doc_id = %s", (doc_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        return int(row[0]) if row else 0
+    except Exception as e:
+        logger.warning(f"Could not count chunks of doc {doc_id} before deleting it: {e}")
+        return None
+
+
+def _log_delete_trigger(conn, doc_id: int, chunks_removed) -> None:
+    """Log the before_document_delete trigger, confirmed by its deletion_audit row.
+
+    Best-effort: a failure here is logged and never fails the delete.
+    """
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT audit_id FROM deletion_audit WHERE doc_id = %s ORDER BY audit_id DESC LIMIT 1",
+            (doc_id,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+    except Exception as e:
+        logger.warning(f"Could not check the deletion_audit row for doc {doc_id}: {e}")
+        return
+
+    if not row:
+        log_db_event(
+            "TRIGGER",
+            f"before_document_delete did not fire: no deletion_audit row for doc_id={doc_id}",
+            level=logging.WARNING,
+        )
+        return
+    cascade = "" if chunks_removed is None else f" (cascade removed {chunks_removed} chunks)"
+    log_db_event(
+        "TRIGGER",
+        f"before_document_delete fired: doc_id={doc_id} → deletion_audit.audit_id={row[0]}{cascade}",
+    )
 
 def delete_chunk_vectors(doc_id: int, conn=None):
     """Delete vectors for the document from pgvector chunk_vectors table.
