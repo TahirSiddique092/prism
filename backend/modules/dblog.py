@@ -12,6 +12,7 @@ addresses, search text or document text.
 """
 import logging
 import time
+import warnings
 from contextlib import contextmanager
 
 logger = logging.getLogger("prism.db")
@@ -50,3 +51,37 @@ def logged_db_call(kind: str, description: str):
     else:
         outcome = ""
     log_db_event(kind, f"{description}{outcome} in {elapsed_ms} ms")
+
+
+def _stored_results(cursor):
+    """The result sets of the last callproc.
+
+    stored_results is a method in the mysql-connector releases we support and is
+    becoming a property (calling the method now warns), so both forms work.
+    """
+    results = cursor.stored_results
+    if callable(results):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            results = results()
+    return results
+
+
+def call_procedure(conn, name: str, **params) -> list[dict]:
+    """CALL a stored procedure and return its rows as dicts (slice-33).
+
+    ``params`` are passed in order as the procedure's arguments and shown in
+    the [DB] PROCEDURE line, e.g. "sp_search_history(user_id=2)". Pass
+    integers only: free text must go through a prepared statement (ADR-017).
+    """
+    args = ", ".join(f"{key}={value}" for key, value in params.items())
+    cursor = conn.cursor()
+    with logged_db_call("PROCEDURE", f"{name}({args})") as call:
+        cursor.callproc(name, tuple(params.values()))
+        rows = []
+        for result in _stored_results(cursor):
+            columns = result.column_names
+            rows.extend(dict(zip(columns, row)) for row in result.fetchall())
+        call.rows = len(rows)
+    cursor.close()
+    return rows

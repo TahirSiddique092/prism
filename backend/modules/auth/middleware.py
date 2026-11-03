@@ -4,6 +4,7 @@ Provides:
 - extract_bearer_token: Parses and validates the Authorization: Bearer <token> header.
 - authenticate_request: Extracts and decodes the JWT, setting g.user_id on success.
 - require_auth: Decorator to protect specific routes and inject g.user_id.
+- require_admin: Like require_auth, and 403 unless the user's role is admin (slice-35).
 - public_route: Decorator to explicitly mark a route as exempt from default auth.
 - register_auth_middleware: Enforces authentication across all routes by default,
   exempting /api/auth/register, /api/auth/login, and /health.
@@ -14,8 +15,10 @@ from flask import Flask, g, jsonify, request
 import jwt
 
 try:
+    from backend.modules.auth.db import get_user_role
     from backend.modules.auth.service import decode_token
 except ImportError:
+    from modules.auth.db import get_user_role
     from modules.auth.service import decode_token
 
 logger = logging.getLogger(__name__)
@@ -152,6 +155,29 @@ def require_auth(fn):
             response, status_code = error_tuple
             return response, status_code
 
+        return fn(*args, **kwargs)
+
+    return decorated_function
+
+
+def require_admin(fn):
+    """Decorator for admin-only routes (slice-35).
+
+    Authenticates like require_auth (401 without a valid token), then reads the
+    user's role from MySQL on every request and returns 403 unless it is
+    'admin'. Reading the role from the database, not the JWT, means promoting
+    or demoting someone takes effect on their next request.
+    """
+    @wraps(fn)
+    def decorated_function(*args, **kwargs):
+        if getattr(g, "user_id", None) is None:
+            success, error_tuple = authenticate_request()
+            if not success:
+                response, status_code = error_tuple
+                return response, status_code
+
+        if get_user_role(g.user_id) != "admin":
+            return jsonify({"error": "Admins only"}), 403
         return fn(*args, **kwargs)
 
     return decorated_function

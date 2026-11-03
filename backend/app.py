@@ -20,6 +20,7 @@ try:
     from backend.modules.documents import embed
     from backend.modules.search import search_bp
     from backend.modules.analytics import analytics_bp
+    from backend.modules.admin import admin_bp
 except ImportError:
     from cors import register_cors_middleware
     from modules.auth import auth_bp, register_auth_middleware
@@ -28,6 +29,7 @@ except ImportError:
     from modules.documents import embed
     from modules.search import search_bp
     from modules.analytics import analytics_bp
+    from modules.admin import admin_bp
 
 
 try:
@@ -75,6 +77,7 @@ def create_app(test_config=None):
     app.register_blueprint(documents_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(analytics_bp)
+    app.register_blueprint(admin_bp)
     
     if not test_config:
         _validate_security_config(app)

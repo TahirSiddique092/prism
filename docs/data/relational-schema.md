@@ -35,6 +35,7 @@ erDiagram
         VARCHAR name
         VARCHAR email UK
         VARCHAR password_hash
+        VARCHAR role "user or admin"
         TIMESTAMP created_at
     }
     documents {
@@ -77,6 +78,8 @@ erDiagram
     deletion_audit {
         INT audit_id PK
         INT doc_id
+        INT user_id
+        VARCHAR title
         TIMESTAMP deleted_at
     }
 ```
@@ -87,7 +90,7 @@ erDiagram
 - A **document** is split into many **chunks** (paragraph-sized pieces of text, about 200 words each).
 - **Documents** and **topics** are many-to-many, resolved through the junction table **doc_topics**.
 - Each **search** (`search_log`) records up to 10 **results**, and each result points to the **chunk** that matched.
-- **deletion_audit** deliberately has no foreign key: it keeps a record of documents that no longer exist.
+- **deletion_audit** deliberately has no foreign key: it keeps a record of documents that no longer exist, with their owner and title.
 
 ---
 
@@ -95,11 +98,13 @@ erDiagram
 
 The ER diagram mapped to relations, drawn in the style of Elmasri & Navathe, Figure 5.7. Each relation is a row of attributes, the primary key is underlined, and each foreign key has an arrow to the primary key it references. Every foreign key is `ON DELETE CASCADE`.
 
-![PRISM relational schema diagram. Relations: users, documents, chunks, topics, doc_topics, search_log, search_results and deletion_audit. Foreign keys: documents.user_id and search_log.user_id reference users; chunks.doc_id and doc_topics.doc_id reference documents; doc_topics.topic_id references topics; search_results.log_id references search_log; search_results.chunk_id references chunks.](relational-schema-diagram.svg)
+![PRISM relational schema diagram. Relations: users (with role), documents, chunks, topics, doc_topics, search_log, search_results and deletion_audit (with user_id and title). Foreign keys: documents.user_id and search_log.user_id reference users; chunks.doc_id and doc_topics.doc_id reference documents; doc_topics.topic_id references topics; search_results.log_id references search_log; search_results.chunk_id references chunks.](relational-schema-diagram.svg)
 
 **Candidate keys:** besides the primary keys, `users.email` and `topics.name` are unique.
 
-`deletion_audit.doc_id` is not a foreign key: it records documents that have already been deleted.
+**Domain constraint:** `users.role` is `'user'` or `'admin'` (a CHECK constraint).
+
+`deletion_audit.doc_id` and `deletion_audit.user_id` are not foreign keys: they record documents that have already been deleted.
 
 **How the ER diagram maps to relations**
 
@@ -122,6 +127,7 @@ Registered accounts.
 | `name` | VARCHAR(255) | Required |
 | `email` | VARCHAR(255) | Required, **UNIQUE**, stored lowercase |
 | `password_hash` | VARCHAR(255) | bcrypt hash (the plain password is never stored) |
+| `role` | VARCHAR(20) | `'user'` (default) or `'admin'`, enforced by a CHECK constraint |
 | `created_at` | TIMESTAMP | Defaults to the current time |
 
 ### `documents`
@@ -187,6 +193,8 @@ Audit trail written by a trigger whenever a document is deleted.
 |---|---|---|
 | `audit_id` | INT, auto-increment | Primary key |
 | `doc_id` | INT | ID of the deleted document (no FK, because the row is gone) |
+| `user_id` | INT, nullable | Who owned it (no FK). `NULL` for deletions logged before migration 010 |
+| `title` | VARCHAR(255), nullable | Its title. `NULL` for deletions logged before migration 010 |
 | `deleted_at` | TIMESTAMP | When the deletion happened |
 
 ### `schema_migrations` (bookkeeping)
@@ -195,6 +203,14 @@ Audit trail written by a trigger whenever a document is deleted.
 ---
 
 ## 5. Constraints, cascades, trigger, view, stored procedures and functions, indexes
+
+### CHECK constraint — `users.role`
+```sql
+ALTER TABLE users
+    ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user',
+    ADD CONSTRAINT chk_users_role CHECK (role IN ('user', 'admin'));
+```
+New accounts are always `user`. An admin is made with `backend/db/set_role.py`, and the admin pages check the role in MySQL on every request.
 
 ### Cascade chain
 Deleting a user or a document cleans up everything that depends on it:
@@ -216,7 +232,8 @@ CREATE TRIGGER before_document_delete
 BEFORE DELETE ON documents
 FOR EACH ROW
 BEGIN
-    INSERT INTO deletion_audit (doc_id, deleted_at) VALUES (OLD.doc_id, NOW());
+    INSERT INTO deletion_audit (doc_id, user_id, title, deleted_at)
+    VALUES (OLD.doc_id, OLD.user_id, OLD.title, NOW());
 END;
 ```
 
@@ -235,25 +252,44 @@ GROUP BY d.doc_id, d.user_id, d.title;
 ```
 
 ### Stored procedures
-The two analytics queries live in MySQL as stored procedures (migration 008). The backend runs them with `CALL`, through `cursor.callproc`, and logs a `[DB] PROCEDURE` line for each call. Their bodies are under Key queries (§ 7).
+The two analytics queries live in MySQL as stored procedures (migration 008), and so do the two admin queries (migration 010). The backend runs them with `CALL`, through `cursor.callproc`, and logs a `[DB] PROCEDURE` line for each call. Their bodies are under Key queries (§ 7).
 
 | Procedure | Returns | Used by |
 |---|---|---|
 | `sp_search_history(IN p_user_id INT)` | The user's searches, ranked by how often they were run (window functions) | Search History page |
 | `sp_unsearched_documents(IN p_user_id INT)` | The user's ready documents that never appeared in a search (CTE) | Unsearched Documents page |
+| `sp_admin_user_overview()` | Every user with their document, chunk and search counts and last search time | Admin page, Users |
+| `sp_admin_system_stats()` | One row of totals: users, admins, documents by status, chunks, searches (all time and today), deletions | Admin page, System stats |
 
 ```sql
 CALL sp_search_history(2);
 CALL sp_unsearched_documents(2);
+CALL sp_admin_user_overview();
+CALL sp_admin_system_stats();
+```
+
+The body of `sp_admin_user_overview` calls three of the stored functions below:
+```sql
+SELECT u.user_id, u.name, u.email, u.role, u.created_at,
+       fn_user_document_count(u.user_id) AS documents,
+       (SELECT COALESCE(SUM(fn_chunk_count(d.doc_id)), 0)
+          FROM documents d WHERE d.user_id = u.user_id) AS chunks,
+       fn_user_search_count(u.user_id) AS searches,
+       (SELECT MAX(sl.searched_at)
+          FROM search_log sl WHERE sl.user_id = u.user_id) AS last_search_at
+FROM users u
+ORDER BY u.created_at;
 ```
 
 ### Stored functions
-Two user-defined functions are used inside the app's queries (migration 009). Each declares what kind of SQL it runs, which MySQL requires when binary logging is on. Each use logs a `[DB] FUNCTION` line.
+Four user-defined functions are used inside the app's queries (migrations 009 and 010). Each declares what kind of SQL it runs, which MySQL requires when binary logging is on. Each use logs a `[DB] FUNCTION` line.
 
 | Function | Returns | Used in |
 |---|---|---|
 | `fn_chunk_count(p_doc_id INT)`, `READS SQL DATA` | INT: the number of chunks a document has (0 if none) | Document list and document detail |
 | `fn_similarity(p_distance DOUBLE)`, `DETERMINISTIC NO SQL` | DOUBLE: `1 - p_distance` (NULL stays NULL) | Top Documents, as `avg_similarity` |
+| `fn_user_document_count(p_user_id INT)`, `READS SQL DATA` | INT: the number of documents a user has uploaded | `sp_admin_user_overview` |
+| `fn_user_search_count(p_user_id INT)`, `READS SQL DATA` | INT: the number of searches a user has run | `sp_admin_user_overview` |
 
 ```sql
 CREATE FUNCTION fn_chunk_count(p_doc_id INT)
@@ -298,11 +334,16 @@ The before/after `EXPLAIN` results for these indexes are in [ADR-001-indexing.md
 
 ## 7. Key queries
 
-These are the main SQL statements the backend runs. Every one is parameterised and scoped to the logged-in user.
+These are the main SQL statements the backend runs. Every one is parameterised and scoped to the logged-in user, except the admin queries, which an admin runs across all users.
 
 **Login lookup** (auth)
 ```sql
 SELECT user_id, name, email, password_hash, created_at FROM users WHERE email = %s;
+```
+
+**Role check** (auth, on every admin request)
+```sql
+SELECT role FROM users WHERE user_id = %s;
 ```
 
 **Document list with chunk counts** (documents, stored function)
@@ -368,6 +409,14 @@ ORDER BY search_count DESC, appearance_count DESC
 LIMIT 10;
 ```
 
+**Deletion log** (admin): the rows the trigger wrote
+```sql
+SELECT audit_id, doc_id, title, user_id, deleted_at
+FROM deletion_audit
+ORDER BY deleted_at DESC, audit_id DESC
+LIMIT 50;
+```
+
 ---
 
 ## 8. Data flow diagrams
@@ -379,10 +428,13 @@ LIMIT 10;
 ```mermaid
 flowchart LR
     S[Student<br/>web browser]
+    A[Admin<br/>web browser]
     P([PRISM System])
 
     S -->|"credentials, PDF + topic tags,<br/>search query"| P
     P -->|"session cookie, document list,<br/>ranked results, PDF view link,<br/>analytics"| S
+    A -->|request| P
+    P -->|"users with counts, totals,<br/>deletion log"| A
 ```
 
 ### Level 1 — System processes
@@ -399,6 +451,8 @@ flowchart LR
     P4([4.0 View document])
     P5([5.0 Delete document])
     P6([6.0 Analytics])
+    P7([7.0 Admin])
+    A[Admin]
 
     D1[(D1 MySQL)]
     D2[(D2 pgvector)]
@@ -439,9 +493,13 @@ flowchart LR
     S -->|request| P6
     P6 <-->|search_log, search_results,<br/>top_documents| D1
     P6 -->|history, unsearched,<br/>top documents| S
+
+    A -->|request| P7
+    P7 <-->|role, users, totals,<br/>deletion_audit| D1
+    P7 -->|users, totals,<br/>deletion log| A
 ```
 
-Processes 2.0 to 5.0 are broken down in [nosql-schema.md § 7](nosql-schema.md#7-data-flow-diagrams), because they span several stores. The two processes below use MySQL only.
+Processes 2.0 to 5.0 are broken down in [nosql-schema.md § 7](nosql-schema.md#7-data-flow-diagrams), because they span several stores. The three processes below use MySQL only.
 
 ### Level 2 — 1.0 Authenticate
 
@@ -490,4 +548,39 @@ flowchart LR
     P61 -->|query, count, rank| S
     P62 -->|doc_id, title| S
     P63 -->|title, appearances, avg score| S
+```
+
+### Level 2 — 7.0 Admin (read-only)
+
+```mermaid
+flowchart LR
+    A[Admin]
+    P71([7.1 Check role<br/>role = admin, else 403])
+    P72([7.2 Users<br/>CALL sp_admin_user_overview<br/>functions])
+    P73([7.3 System stats<br/>CALL sp_admin_system_stats])
+    P74([7.4 Deletion log])
+    DU[(D1.1 users)]
+    DD[(D1.2 documents)]
+    DC[(D1.3 chunks)]
+    DL[(D1.5 search_log)]
+    DA[(D1.7 deletion_audit)]
+
+    A -->|request + JWT| P71
+    DU -->|role| P71
+    P71 --> P72
+    P71 --> P73
+    P71 --> P74
+    DU --> P72
+    DD --> P72
+    DC --> P72
+    DL --> P72
+    DU --> P73
+    DD --> P73
+    DC --> P73
+    DL --> P73
+    DA --> P73
+    DA --> P74
+    P72 -->|name, email, role, counts| A
+    P73 -->|totals| A
+    P74 -->|doc_id, title, owner, time| A
 ```

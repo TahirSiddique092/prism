@@ -13,8 +13,10 @@
 <text x="397.0" y="165.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">email</text>
 <rect x="445" y="138" width="136" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
 <text x="513.0" y="165.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">password_hash</text>
-<rect x="581" y="138" width="114" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
-<text x="638.0" y="165.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">created_at</text>
+<rect x="581" y="138" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="629.0" y="165.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">role</text>
+<rect x="677" y="138" width="114" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="734.0" y="165.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">created_at</text>
 <text x="157" y="270" font-size="15" font-weight="700" fill="#111827">DOCUMENTS</text>
 <rect x="157" y="280" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
 <text x="205.0" y="307.0" text-anchor="middle" font-size="13" font-weight="700" fill="#111827" text-decoration="underline">doc_id</text>
@@ -76,8 +78,12 @@
 <text x="206.5" y="1278.0" text-anchor="middle" font-size="13" font-weight="700" fill="#111827" text-decoration="underline">audit_id</text>
 <rect x="256" y="1251" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
 <text x="304.0" y="1278.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">doc_id</text>
-<rect x="352" y="1251" width="114" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
-<text x="409.0" y="1278.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">deleted_at</text>
+<rect x="352" y="1251" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="400.0" y="1278.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">user_id</text>
+<rect x="448" y="1251" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="496.0" y="1278.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">title</text>
+<rect x="544" y="1251" width="114" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="601.0" y="1278.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">deleted_at</text>
 <path d="M301.0,324.0 L301.0,378.0 L118.5,378.0 L118.5,207.0 L213.0,207.0 L213.0,183.0" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow0)"/>
 <text x="315.0" y="382.5" font-size="12" font-weight="600" fill="#2563eb">documents.user_id → users.user_id (ON DELETE CASCADE)</text>
 <path d="M304.0,504.0 L304.0,545.0 L105.5,545.0 L105.5,349.0 L213.0,349.0 L213.0,325.0" fill="none" stroke="#d97706" stroke-width="2" marker-end="url(#arrow1)"/>

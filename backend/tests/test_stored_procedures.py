@@ -134,7 +134,7 @@ def test_call_procedure_returns_rows_by_column_name_and_logs(caplog):
     caplog.set_level(logging.INFO, logger="prism.db")
     conn = _proc_conn(("doc_id", "title"), [(4, "a.pdf"), (5, "b.pdf")])
 
-    rows = call_procedure(conn, "sp_unsearched_documents", 9)
+    rows = call_procedure(conn, "sp_unsearched_documents", user_id=9)
 
     cursor = conn.cursor.return_value
     assert cursor.mock_calls[:2] == [call.callproc("sp_unsearched_documents", (9,)), call.stored_results()]
@@ -163,7 +163,7 @@ def test_stored_results_as_a_property_also_works():
 
     conn = MagicMock()
     conn.cursor.return_value = Cursor()
-    assert call_procedure(conn, "sp_unsearched_documents", 1) == [{"doc_id": 7}]
+    assert call_procedure(conn, "sp_unsearched_documents", user_id=1) == [{"doc_id": 7}]
 
 
 def test_analytics_endpoints_use_the_procedures(caplog):
@@ -229,11 +229,11 @@ def test_integration_procedures_exist_and_match_the_old_queries():
         for uid in user_ids:
             cur.execute(OLD_SEARCH_HISTORY, (uid,))
             old_history = [dict(zip(cur.column_names, r)) for r in cur.fetchall()]
-            assert call_procedure(conn, "sp_search_history", uid) == old_history
+            assert call_procedure(conn, "sp_search_history", user_id=uid) == old_history
 
             cur.execute(OLD_UNSEARCHED, (uid, uid))
             old_unsearched = sorted((dict(zip(cur.column_names, r)) for r in cur.fetchall()), key=lambda d: d["doc_id"])
-            new_unsearched = sorted(call_procedure(conn, "sp_unsearched_documents", uid), key=lambda d: d["doc_id"])
+            new_unsearched = sorted(call_procedure(conn, "sp_unsearched_documents", user_id=uid), key=lambda d: d["doc_id"])
             assert new_unsearched == old_unsearched
         cur.close()
     finally:

@@ -42,12 +42,13 @@ flowchart LR
 
 ## Modules
 
-- `auth` — register, login, logout. Issues and verifies JWTs. Handles password hashing with bcrypt. Owns the `users` table.
+- `auth` — register, login, logout. Issues and verifies JWTs. Handles password hashing with bcrypt. Owns the `users` table, including each account's role (`user` or `admin`), which `require_admin` reads from MySQL on every admin request (ADR-023).
 - `documents` — receives PDF upload from client, stores the file in MinIO, parses text with PyMuPDF, splits into sentence-boundary-aware chunks, embeds each chunk via the embedding model, writes document metadata to MySQL and chunk vectors to pgvector. Also handles document deletion and listing.
 - `search` — accepts a plain-English query, embeds it, runs cosine similarity search on pgvector. If the best match distance exceeds 0.75, falls back to MySQL FULLTEXT search; otherwise drops matches beyond 0.60 distance, keeping the best (ADR-020). Logs every search to `search_log` and writes top results to `search_results`. Calls `cache` before hitting pgvector.
 - `cache` — Redis read/write/invalidate layer. Key format: `search:{user_id}:{md5(query)}`. TTL: 3600s. Invalidates a user's cache on new document upload. Used by `search`; reusable across other modules.
 - `graph` — on document upload, writes `(Document)-[:ABOUT]->(Topic)` nodes and relationships to Neo4j using manually assigned topic tags. Exposes a query to find related documents by shared topics.
 - `analytics` — read-only reporting module. Serves search history ranked with window functions, unsearched documents via CTE, and top documents via the `top_documents` view. No writes.
+- `admin` — read-only, admins only. Lists every user with their counts, system-wide totals (stored procedures) and the deletion log written by the `before_document_delete` trigger. Never returns password hashes, search text or document text.
 
 ---
 
@@ -58,6 +59,7 @@ flowchart LR
 | POST | `/api/auth/register` | `{ name, email, password }` | `{ user_id, token }` |
 | POST | `/api/auth/login` | `{ email, password }` | `{ user_id, token }` |
 | POST | `/api/auth/logout` | — | `{ message }` |
+| GET | `/api/auth/me` | — | `{ user_id, name, email, role }` |
 | GET | `/api/documents` | — | `[{ doc_id, title, uploaded_at, status, chunk_count }]` |
 | GET | `/api/documents/:doc_id` | — | `{ doc_id, title, uploaded_at, status, chunk_count, topics }` |
 | GET | `/api/documents/:doc_id/url` | — | `{ view_url }` |
@@ -70,10 +72,13 @@ flowchart LR
 | GET | `/api/analytics/history` | — | `[{ query_text, search_count, query_rank, last_searched, total_searches }]` |
 | GET | `/api/analytics/unsearched` | — | `[{ doc_id, title, uploaded_at }]` |
 | GET | `/api/analytics/top-documents` | — | `[{ doc_id, title, search_count, appearance_count, avg_score, avg_similarity }]` |
+| GET | `/api/admin/users` | — (admin) | `[{ user_id, name, email, role, created_at, documents, chunks, searches, last_search_at }]` |
+| GET | `/api/admin/stats` | — (admin) | `{ users, admins, documents, documents_processing, documents_ready, documents_error, chunks, searches, searches_today, deletions }` |
+| GET | `/api/admin/deletions` | — (admin) | `[{ audit_id, doc_id, title, user_id, deleted_at }]` (latest 50) |
 
-All protected routes require `Authorization: Bearer <token>` header.
+All protected routes require `Authorization: Bearer <token>` header. `/api/admin/*` also requires the `admin` role: 401 without a session, 403 for a `user`.
 
-Timestamps (`uploaded_at`, `last_searched`) are UTC in ISO 8601 with a `Z` suffix, e.g. `2026-10-29T16:00:09Z`; the frontend shows them in the viewer's time zone. `score` is the cosine distance (lower is closer), or `null` for FULLTEXT results; the frontend shows it as similarity, 1 − distance.
+Timestamps (`uploaded_at`, `last_searched`, `created_at`, `last_search_at`, `deleted_at`) are UTC in ISO 8601 with a `Z` suffix, e.g. `2026-10-29T16:00:09Z`; the frontend shows them in the viewer's time zone. `score` is the cosine distance (lower is closer), or `null` for FULLTEXT results; the frontend shows it as similarity, 1 − distance.
 
 ---
 
@@ -81,7 +86,7 @@ Timestamps (`uploaded_at`, `last_searched`) are UTC in ISO 8601 with a `Z` suffi
 
 Full schema, diagrams and data flows: [relational-schema.md](data/relational-schema.md) (MySQL) and [nosql-schema.md](data/nosql-schema.md) (pgvector, Neo4j, Redis, object storage).
 
-- `User` — has many `Documents`, has many `SearchLogs`
+- `User` — has a role (`user` or `admin`), has many `Documents`, has many `SearchLogs`
 - `Document` — belongs to `User`, has many `Chunks`, has many `Topics` (via `DocTopics`)
 - `Chunk` — belongs to `Document`, carries the embedding vector, appears in many `SearchResults`
 - `Topic` — has many `Documents` (via `DocTopics`)
