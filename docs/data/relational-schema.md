@@ -91,7 +91,27 @@ erDiagram
 
 ---
 
-## 3. Tables
+## 3. Relational schema
+
+The ER diagram mapped to relations, drawn in the style of Elmasri & Navathe, Figure 5.7. Each relation is a row of attributes, the primary key is underlined, and each foreign key has an arrow to the primary key it references. Every foreign key is `ON DELETE CASCADE`.
+
+![PRISM relational schema diagram. Relations: users, documents, chunks, topics, doc_topics, search_log, search_results and deletion_audit. Foreign keys: documents.user_id and search_log.user_id reference users; chunks.doc_id and doc_topics.doc_id reference documents; doc_topics.topic_id references topics; search_results.log_id references search_log; search_results.chunk_id references chunks.](relational-schema-diagram.svg)
+
+**Candidate keys:** besides the primary keys, `users.email` and `topics.name` are unique.
+
+`deletion_audit.doc_id` is not a foreign key: it records documents that have already been deleted.
+
+**How the ER diagram maps to relations**
+
+| ER construct | Relational schema |
+|---|---|
+| Each entity: users, documents, chunks, topics, search_log, search_results, deletion_audit | One relation each, with an auto-increment primary key |
+| 1:N relationships: uploads, performs, is split into, returns, appears in | A foreign key on the "many" side: `documents.user_id`, `search_log.user_id`, `chunks.doc_id`, `search_results.log_id`, `search_results.chunk_id` |
+| M:N relationship between documents and topics | A separate relation, `doc_topics`, whose primary key is the pair of foreign keys |
+
+---
+
+## 4. Tables
 
 ### `users`
 Registered accounts.
@@ -174,7 +194,7 @@ Audit trail written by a trigger whenever a document is deleted.
 
 ---
 
-## 4. Constraints, cascades, view, trigger, indexes
+## 5. Constraints, cascades, view, trigger, indexes
 
 ### Cascade chain
 Deleting a user or a document cleans up everything that depends on it:
@@ -227,7 +247,7 @@ The before/after `EXPLAIN` results for these indexes are in [ADR-001-indexing.md
 
 ---
 
-## 5. Normalization
+## 6. Normalization
 
 | Normal form | How the schema meets it |
 |---|---|
@@ -238,7 +258,7 @@ The before/after `EXPLAIN` results for these indexes are in [ADR-001-indexing.md
 
 ---
 
-## 6. Key queries
+## 7. Key queries
 
 These are the main SQL statements the backend runs. Every one is parameterised and scoped to the logged-in user.
 
@@ -308,7 +328,7 @@ LIMIT 10;
 
 ---
 
-## 7. Data flow diagrams
+## 8. Data flow diagrams
 
 **Notation:** rectangle = external entity · rounded box = process · cylinder = data store · arrow = data flow.
 

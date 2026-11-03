@@ -202,7 +202,7 @@ The code uses the standard S3 API (boto3), so the same code runs against MinIO, 
 
 ## 7. Data flow diagrams
 
-**Notation:** rectangle = external entity · rounded box = process · cylinder = data store · arrow = data flow. These are Level 2 breakdowns of the Level 1 processes in [relational-schema.md § 7](relational-schema.md#7-data-flow-diagrams).
+**Notation:** rectangle = external entity · rounded box = process · cylinder = data store · arrow = data flow. These are Level 2 breakdowns of the Level 1 processes in [relational-schema.md § 8](relational-schema.md#8-data-flow-diagrams).
 
 ### Level 2 — 2.0 Upload & process document
 

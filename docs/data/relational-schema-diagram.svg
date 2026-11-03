@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="874" height="1355" viewBox="0 0 874 1355" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+<rect width="874" height="1355" fill="#ffffff"/>
+<defs><marker id="arrow0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker><marker id="arrow1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker><marker id="arrow3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker><marker id="arrow4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker><marker id="arrow5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0891b2"/></marker><marker id="arrow6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#db2777"/></marker></defs>
+<text x="40" y="38" font-size="21" font-weight="700" fill="#111827">PRISM: Relational Database Schema Diagram</text>
+<text x="40" y="62" font-size="13" fill="#4b5563">Referential integrity constraints and foreign key references (Elmasri &amp; Navathe, Chapter 5, Figure 5.7 format).</text>
+<text x="40" y="80" font-size="13" fill="#4b5563">Primary keys are underlined. Each foreign key has its own colour, with an arrow to the primary key it references.</text>
+<text x="157" y="128" font-size="15" font-weight="700" fill="#111827">USERS</text>
+<rect x="157" y="138" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="205.0" y="165.0" text-anchor="middle" font-size="13" font-weight="700" fill="#111827" text-decoration="underline">user_id</text>
+<rect x="253" y="138" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="301.0" y="165.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">name</text>
+<rect x="349" y="138" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="397.0" y="165.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">email</text>
+<rect x="445" y="138" width="136" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="513.0" y="165.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">password_hash</text>
+<rect x="581" y="138" width="114" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="638.0" y="165.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">created_at</text>
+<text x="157" y="270" font-size="15" font-weight="700" fill="#111827">DOCUMENTS</text>
+<rect x="157" y="280" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="205.0" y="307.0" text-anchor="middle" font-size="13" font-weight="700" fill="#111827" text-decoration="underline">doc_id</text>
+<rect x="253" y="280" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="301.0" y="307.0" text-anchor="middle" font-size="13" font-weight="700" fill="#2563eb">user_id</text>
+<rect x="349" y="280" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="397.0" y="307.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">title</text>
+<rect x="445" y="280" width="107" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="498.5" y="307.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">minio_key</text>
+<rect x="552" y="280" width="121" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="612.5" y="307.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">uploaded_at</text>
+<rect x="673" y="280" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="721.0" y="307.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">status</text>
+<text x="157" y="450" font-size="15" font-weight="700" fill="#111827">CHUNKS</text>
+<rect x="157" y="460" width="99" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="206.5" y="487.0" text-anchor="middle" font-size="13" font-weight="700" fill="#111827" text-decoration="underline">chunk_id</text>
+<rect x="256" y="460" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="304.0" y="487.0" text-anchor="middle" font-size="13" font-weight="700" fill="#d97706">doc_id</text>
+<rect x="352" y="460" width="114" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="409.0" y="487.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">chunk_text</text>
+<rect x="466" y="460" width="121" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="526.5" y="487.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">chunk_index</text>
+<rect x="587" y="460" width="114" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="644.0" y="487.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">page_start</text>
+<rect x="701" y="460" width="99" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="750.5" y="487.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">page_end</text>
+<text x="157" y="617" font-size="15" font-weight="700" fill="#111827">TOPICS</text>
+<rect x="157" y="627" width="99" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="206.5" y="654.0" text-anchor="middle" font-size="13" font-weight="700" fill="#111827" text-decoration="underline">topic_id</text>
+<rect x="256" y="627" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="304.0" y="654.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">name</text>
+<text x="157" y="746" font-size="15" font-weight="700" fill="#111827">DOC_TOPICS (M:N association)</text>
+<rect x="157" y="756" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="205.0" y="783.0" text-anchor="middle" font-size="13" font-weight="700" fill="#dc2626" text-decoration="underline">doc_id</text>
+<rect x="253" y="756" width="99" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="302.5" y="783.0" text-anchor="middle" font-size="13" font-weight="700" fill="#7c3aed" text-decoration="underline">topic_id</text>
+<text x="157" y="910" font-size="15" font-weight="700" fill="#111827">SEARCH_LOG</text>
+<rect x="157" y="920" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="205.0" y="947.0" text-anchor="middle" font-size="13" font-weight="700" fill="#111827" text-decoration="underline">log_id</text>
+<rect x="253" y="920" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="301.0" y="947.0" text-anchor="middle" font-size="13" font-weight="700" fill="#db2777">user_id</text>
+<rect x="349" y="920" width="114" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="406.0" y="947.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">query_text</text>
+<rect x="463" y="920" width="121" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="523.5" y="947.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">searched_at</text>
+<text x="157" y="1077" font-size="15" font-weight="700" fill="#111827">SEARCH_RESULTS</text>
+<rect x="157" y="1087" width="107" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="210.5" y="1114.0" text-anchor="middle" font-size="13" font-weight="700" fill="#111827" text-decoration="underline">result_id</text>
+<rect x="264" y="1087" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="312.0" y="1114.0" text-anchor="middle" font-size="13" font-weight="700" fill="#059669">log_id</text>
+<rect x="360" y="1087" width="99" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="409.5" y="1114.0" text-anchor="middle" font-size="13" font-weight="700" fill="#0891b2">chunk_id</text>
+<rect x="459" y="1087" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="507.0" y="1114.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">rank</text>
+<rect x="555" y="1087" width="158" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="634.0" y="1114.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">similarity_score</text>
+<text x="157" y="1241" font-size="15" font-weight="700" fill="#111827">DELETION_AUDIT</text>
+<rect x="157" y="1251" width="99" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="206.5" y="1278.0" text-anchor="middle" font-size="13" font-weight="700" fill="#111827" text-decoration="underline">audit_id</text>
+<rect x="256" y="1251" width="96" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="304.0" y="1278.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">doc_id</text>
+<rect x="352" y="1251" width="114" height="44" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+<text x="409.0" y="1278.0" text-anchor="middle" font-size="13" font-weight="400" fill="#111827">deleted_at</text>
+<path d="M301.0,324.0 L301.0,378.0 L118.5,378.0 L118.5,207.0 L213.0,207.0 L213.0,183.0" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow0)"/>
+<text x="315.0" y="382.5" font-size="12" font-weight="600" fill="#2563eb">documents.user_id → users.user_id (ON DELETE CASCADE)</text>
+<path d="M304.0,504.0 L304.0,545.0 L105.5,545.0 L105.5,349.0 L213.0,349.0 L213.0,325.0" fill="none" stroke="#d97706" stroke-width="2" marker-end="url(#arrow1)"/>
+<text x="318.0" y="549.5" font-size="12" font-weight="600" fill="#d97706">chunks.doc_id → documents.doc_id (ON DELETE CASCADE)</text>
+<path d="M205.0,800.0 L205.0,816.0 L66.5,816.0 L66.5,336.0 L197.0,336.0 L197.0,325.0" fill="none" stroke="#dc2626" stroke-width="2" marker-end="url(#arrow4)"/>
+<text x="316.5" y="820.5" font-size="12" font-weight="600" fill="#dc2626">doc_topics.doc_id → documents.doc_id (ON DELETE CASCADE)</text>
+<path d="M302.5,800.0 L302.5,838.0 L92.5,838.0 L92.5,683.0 L206.5,683.0 L206.5,672.0" fill="none" stroke="#7c3aed" stroke-width="2" marker-end="url(#arrow2)"/>
+<text x="316.5" y="842.5" font-size="12" font-weight="600" fill="#7c3aed">doc_topics.topic_id → topics.topic_id (ON DELETE CASCADE)</text>
+<path d="M301.0,964.0 L301.0,1005.0 L40.5,1005.0 L40.5,194.0 L197.0,194.0 L197.0,183.0" fill="none" stroke="#db2777" stroke-width="2" marker-end="url(#arrow6)"/>
+<text x="315.0" y="1009.5" font-size="12" font-weight="600" fill="#db2777">search_log.user_id → users.user_id (ON DELETE CASCADE)</text>
+<path d="M312.0,1131.0 L312.0,1147.0 L79.5,1147.0 L79.5,976.0 L205.0,976.0 L205.0,965.0" fill="none" stroke="#059669" stroke-width="2" marker-end="url(#arrow3)"/>
+<text x="423.5" y="1151.5" font-size="12" font-weight="600" fill="#059669">search_results.log_id → search_log.log_id (ON DELETE CASCADE)</text>
+<path d="M409.5,1131.0 L409.5,1169.0 L53.5,1169.0 L53.5,516.0 L206.5,516.0 L206.5,505.0" fill="none" stroke="#0891b2" stroke-width="2" marker-end="url(#arrow5)"/>
+<text x="423.5" y="1173.5" font-size="12" font-weight="600" fill="#0891b2">search_results.chunk_id → chunks.chunk_id (ON DELETE CASCADE)</text>
+</svg>
