@@ -12,7 +12,17 @@ Acceptance criteria verified:
 from pathlib import Path
 import pytest
 
-from backend.modules.analytics.db import SEARCH_HISTORY_QUERY, UNSEARCHED_DOCS_QUERY
+
+
+def _procedure_body(name):
+    """The analytics queries live in stored procedures since slice-33 (migration 008)."""
+    sql = (Path(__file__).parent.parent / "db" / "migrations" / "008_stored_procedures.sql").read_text()
+    start = sql.index(f"CREATE PROCEDURE {name}(")
+    return sql[start:sql.index("END //", start)]
+
+
+SEARCH_HISTORY_QUERY = _procedure_body("sp_search_history")
+UNSEARCHED_DOCS_QUERY = _procedure_body("sp_unsearched_documents")
 
 
 REPO_ROOT = Path(__file__).parent.parent.parent

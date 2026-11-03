@@ -8,12 +8,13 @@ Acceptance criteria verified:
 5. Only returns the current user's queries — never another user's
 """
 import datetime
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.app import create_app
 from backend.modules.auth.service import generate_token
-from backend.modules.analytics.db import get_search_history, SEARCH_HISTORY_QUERY
+from backend.modules.analytics.db import get_search_history
 
 
 @pytest.fixture
@@ -248,43 +249,47 @@ def test_search_history_db_error_returns_500(client, user1_token):
 # 6. Raw SQL Window Function Contract Tests
 # ============================================================================
 
-def test_raw_sql_search_history_contract():
-    """Verify get_search_history query contains exact window functions and parameter binding."""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_conn.cursor.return_value = mock_cursor
+MIGRATION_008 = Path(__file__).parent.parent / "db" / "migrations" / "008_stored_procedures.sql"
 
-    # Simulate dictionary cursor rows
-    mock_cursor.fetchall.return_value = [
-        {
-            "query_text": "postgresql pgvector",
-            "search_count": 8,
-            "query_rank": 1,
-            "last_searched": datetime.datetime(2026, 10, 10, 14, 20, 0),
-            "total_searches": 12,
-        },
-        {
-            "query_text": "mysql transactions",
-            "search_count": 4,
-            "query_rank": 2,
-            "last_searched": datetime.datetime(2026, 10, 9, 10, 15, 0),
-            "total_searches": 12,
-        },
-    ]
+
+def _procedure_body(name):
+    """The body of a stored procedure as created by migration 008 (slice-33)."""
+    sql = MIGRATION_008.read_text()
+    start = sql.index(f"CREATE PROCEDURE {name}(")
+    return sql[start:sql.index("END //", start)]
+
+
+def _proc_conn(columns, rows):
+    """A mock connection whose cursor.callproc yields one result set."""
+    conn = MagicMock()
+    result = MagicMock()
+    result.column_names = columns
+    result.fetchall.return_value = rows
+    conn.cursor.return_value.stored_results.return_value = [result]
+    return conn
+
+
+def test_raw_sql_search_history_contract():
+    """get_search_history calls sp_search_history, which holds the window functions (slice-33)."""
+    mock_conn = _proc_conn(
+        ("query_text", "search_count", "query_rank", "last_searched", "total_searches"),
+        [
+            ("postgresql pgvector", 8, 1, datetime.datetime(2026, 10, 10, 14, 20, 0), 12),
+            ("mysql transactions", 4, 2, datetime.datetime(2026, 10, 9, 10, 15, 0), 12),
+        ],
+    )
 
     history = get_search_history(user_id=42, conn=mock_conn)
 
-    # 1. SQL query assertions
-    mock_cursor.execute.assert_called_once()
-    query_called, params_called = mock_cursor.execute.call_args[0]
-
-    assert "FROM search_log" in query_called
-    assert "WHERE user_id = %s" in query_called
-    assert "GROUP BY query_text" in query_called
-    assert "RANK() OVER (ORDER BY COUNT(*) DESC)" in query_called
-    assert "SUM(COUNT(*)) OVER ()" in query_called
-    assert "ORDER BY query_rank" in query_called
-    assert params_called == (42,)
+    # 1. The stored procedure is called with the user ID
+    mock_conn.cursor.return_value.callproc.assert_called_once_with("sp_search_history", (42,))
+    body = _procedure_body("sp_search_history")
+    assert "FROM search_log" in body
+    assert "WHERE user_id = p_user_id" in body
+    assert "GROUP BY query_text" in body
+    assert "RANK() OVER (ORDER BY COUNT(*) DESC)" in body
+    assert "SUM(COUNT(*)) OVER ()" in body
+    assert "ORDER BY query_rank" in body
 
     # 2. Result mapping assertions
     assert len(history) == 2
@@ -301,22 +306,12 @@ def test_raw_sql_search_history_contract():
     assert history[1]["total_searches"] == 12
 
 
-def test_raw_sql_search_history_tuple_cursor_fallback():
-    """Verify get_search_history works correctly with tuple cursor format."""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    # Simulate cursor without dictionary support
-    mock_conn.cursor.side_effect = lambda dictionary=False: mock_cursor if not dictionary else (_ for _ in ()).throw(TypeError())
-
-    mock_cursor.fetchall.return_value = [
-        (
-            "acid properties",
-            3,
-            1,
-            datetime.datetime(2026, 10, 8, 16, 45, 0),
-            3,
-        )
-    ]
+def test_raw_sql_search_history_maps_columns_by_name():
+    """Rows are read by the procedure's column names, not their position."""
+    mock_conn = _proc_conn(
+        ("total_searches", "last_searched", "query_rank", "search_count", "query_text"),
+        [(3, datetime.datetime(2026, 10, 8, 16, 45, 0), 1, 3, "acid properties")],
+    )
 
     history = get_search_history(user_id=99, conn=mock_conn)
 
@@ -330,10 +325,7 @@ def test_raw_sql_search_history_tuple_cursor_fallback():
 
 def test_raw_sql_search_history_empty_db_result():
     """Verify get_search_history returns empty list when MySQL returns 0 rows."""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_conn.cursor.return_value = mock_cursor
-    mock_cursor.fetchall.return_value = []
+    mock_conn = _proc_conn(("query_text", "search_count", "query_rank", "last_searched", "total_searches"), [])
 
     history = get_search_history(user_id=10, conn=mock_conn)
 

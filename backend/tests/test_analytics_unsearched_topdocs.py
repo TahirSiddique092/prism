@@ -17,7 +17,6 @@ from backend.modules.auth.service import generate_token
 from backend.modules.analytics.db import (
     get_unsearched_documents,
     get_top_documents,
-    UNSEARCHED_DOCS_QUERY,
     TOP_DOCUMENTS_QUERY,
 )
 
@@ -289,34 +288,44 @@ def test_top_documents_db_error_returns_500(client, user1_token):
 # 5. Raw SQL Contract Tests
 # ============================================================================
 
-def test_raw_sql_unsearched_docs_contract():
-    """Verify get_unsearched_documents executes exact CTE and binds user_id twice."""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_conn.cursor.return_value = mock_cursor
+MIGRATION_008 = Path(__file__).parent.parent / "db" / "migrations" / "008_stored_procedures.sql"
 
-    mock_cursor.fetchall.return_value = [
-        {
-            "doc_id": 50,
-            "title": "Unsearched Research Paper.pdf",
-            "uploaded_at": datetime.datetime(2026, 10, 10, 10, 0, 0),
-        }
-    ]
+
+def _procedure_body(name):
+    """The body of a stored procedure as created by migration 008 (slice-33)."""
+    sql = MIGRATION_008.read_text()
+    start = sql.index(f"CREATE PROCEDURE {name}(")
+    return sql[start:sql.index("END //", start)]
+
+
+def _proc_conn(columns, rows):
+    """A mock connection whose cursor.callproc yields one result set."""
+    conn = MagicMock()
+    result = MagicMock()
+    result.column_names = columns
+    result.fetchall.return_value = rows
+    conn.cursor.return_value.stored_results.return_value = [result]
+    return conn
+
+
+def test_raw_sql_unsearched_docs_contract():
+    """get_unsearched_documents calls sp_unsearched_documents, which holds the CTE (slice-33)."""
+    mock_conn = _proc_conn(
+        ("doc_id", "title", "uploaded_at"),
+        [(50, "Unsearched Research Paper.pdf", datetime.datetime(2026, 10, 10, 10, 0, 0))],
+    )
 
     docs = get_unsearched_documents(user_id=7, conn=mock_conn)
 
-    mock_cursor.execute.assert_called_once()
-    query_called, params_called = mock_cursor.execute.call_args[0]
+    mock_conn.cursor.return_value.callproc.assert_called_once_with("sp_unsearched_documents", (7,))
 
-    # Verify CTE structure
-    assert "WITH searched_docs AS" in query_called
-    assert "JOIN search_log sl ON sr.log_id = sl.log_id" in query_called
-    assert "WHERE sl.user_id = %s" in query_called
-    assert "WHERE user_id = %s" in query_called
-    assert "doc_id NOT IN (SELECT doc_id FROM searched_docs)" in query_called
-
-    # User ID bound for both sl.user_id and documents.user_id
-    assert params_called == (7, 7)
+    # Verify CTE structure inside the procedure
+    body = _procedure_body("sp_unsearched_documents")
+    assert "WITH searched_docs AS" in body
+    assert "JOIN search_log sl ON sr.log_id = sl.log_id" in body
+    assert "WHERE sl.user_id = p_user_id" in body
+    assert "WHERE user_id = p_user_id" in body
+    assert "doc_id NOT IN (SELECT doc_id FROM searched_docs)" in body
 
     assert len(docs) == 1
     assert docs[0]["doc_id"] == 50
@@ -324,15 +333,12 @@ def test_raw_sql_unsearched_docs_contract():
     assert docs[0]["uploaded_at"] == "2026-10-10T10:00:00Z"  # UTC, marked with Z (slice-25)
 
 
-def test_raw_sql_unsearched_docs_tuple_fallback():
-    """Verify get_unsearched_documents works with tuple cursor."""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_conn.cursor.side_effect = lambda dictionary=False: mock_cursor if not dictionary else (_ for _ in ()).throw(TypeError())
-
-    mock_cursor.fetchall.return_value = [
-        (88, "Tuple Document.pdf", datetime.datetime(2026, 10, 9, 14, 0, 0))
-    ]
+def test_raw_sql_unsearched_docs_maps_columns_by_name():
+    """Rows are read by the procedure's column names, not their position."""
+    mock_conn = _proc_conn(
+        ("uploaded_at", "doc_id", "title"),
+        [(datetime.datetime(2026, 10, 9, 14, 0, 0), 88, "Tuple Document.pdf")],
+    )
 
     docs = get_unsearched_documents(user_id=1, conn=mock_conn)
     assert len(docs) == 1
