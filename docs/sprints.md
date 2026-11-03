@@ -11,6 +11,7 @@
 | [Sprint 5](sprints/sprint-05-frontend.md) | Frontend | 16–20 | slice-16, slice-18, slice-20 | slice-17, slice-19 |
 | [Sprint 6](sprints/sprint-06-polish-deployment.md) | Polish & deployment | 21–23 | slice-22 | slice-21, slice-23 |
 | [Sprint 7](sprints/sprint-07-hardening-ux.md) | Hardening & UX | 24–31 | Unassigned | Unassigned |
+| [Sprint 8](sprints/sprint-08-dbms-admin.md) | DBMS features & admin | 32–35 | Unassigned | Unassigned |
 
 ## Totals
 
